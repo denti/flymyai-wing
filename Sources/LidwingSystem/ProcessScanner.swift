@@ -33,7 +33,10 @@ public enum ProcessScanner {
         guard byteCount > 0 else { return [] }
         let count = Int(byteCount) / MemoryLayout<pid_t>.size
 
-        var pathBuffer = [CChar](repeating: 0, count: Int(PROC_PIDPATHINFO_MAXSIZE))
+        // `PROC_PIDPATHINFO_MAXSIZE` is a macro (4 * MAXPATHLEN) and does not survive into
+        // Swift, so the value is spelled out.
+        let maximumPathLength = 4 * Int(MAXPATHLEN)
+        var pathBuffer = [CChar](repeating: 0, count: maximumPathLength)
         for index in 0..<count {
             let pid = pids[index]
             guard pid > 0 else { continue }

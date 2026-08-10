@@ -1,0 +1,41 @@
+# Tests get their own rules.
+#
+# A test that hides its intent behind guard-let ceremony is a worse test: in a test a force
+# unwrap *is* an assertion, and it fails loudly with a line number. The production rules stay
+# strict; these do not leak back into Sources.
+
+opt_in_rules:
+  - closure_spacing
+  - explicit_init
+  - first_where
+  - joined_default_parameter
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+
+disabled_rules:
+  - force_unwrapping
+  - force_try
+  - large_tuple            # a test harness returning its five mocks is clearer as a tuple
+  - type_body_length       # one XCTestCase per subject; splitting it would scatter the subject
+  - file_length
+  - function_body_length
+  - todo
+
+line_length:
+  warning: 110
+  error: 140
+  ignores_comments: false
+  ignores_urls: true
+
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1
+  max_length:
+    warning: 60
+    error: 80
+
+nesting:
+  type_level: 2

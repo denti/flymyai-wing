@@ -9,7 +9,8 @@ final class StateMachineTests: XCTestCase {
         let (system, _, _, watchdog, machine) = TestFixture.harness()
 
         let armEffects = machine.handle(.userArm)
-        XCTAssertEqual(machine.state, .arming, "arming must not be reported as armed before the machine agrees")
+        XCTAssertEqual(machine.state, .arming,
+                       "arming must not be reported as armed before the machine agrees")
         XCTAssertTrue(armEffects.contains(.startTimer(.verify)))
         XCTAssertEqual(system.lastClamshellWrite, true)
         XCTAssertEqual(system.assertionWrites, [true])

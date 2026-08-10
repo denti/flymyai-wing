@@ -41,6 +41,7 @@ public final class SystemObservers {
 
     private var powerSourceSource: CFRunLoopSource?
     private var displayCallbackInstalled = false
+    private var thermalToken: NSObjectProtocol?
 
     /// Last known lid state, so we can diff rather than count.
     ///
@@ -77,7 +78,8 @@ public final class SystemObservers {
     public func stop() {
         if interestNotifier != 0 { IOObjectRelease(interestNotifier); interestNotifier = 0 }
         if let port = interestPort {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), IONotificationPortGetRunLoopSource(port).takeUnretainedValue(), .defaultMode)
+            let source = IONotificationPortGetRunLoopSource(port).takeUnretainedValue()
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
             IONotificationPortDestroy(port)
             interestPort = nil
         }
@@ -86,7 +88,8 @@ public final class SystemObservers {
             powerNotifier = 0
         }
         if let port = powerPort {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), IONotificationPortGetRunLoopSource(port).takeUnretainedValue(), .defaultMode)
+            let source = IONotificationPortGetRunLoopSource(port).takeUnretainedValue()
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
             IONotificationPortDestroy(port)
             powerPort = nil
         }
@@ -103,7 +106,10 @@ public final class SystemObservers {
                                                    Unmanaged.passUnretained(self).toOpaque())
             displayCallbackInstalled = false
         }
-        NotificationCenter.default.removeObserver(self)
+        if let token = thermalToken {
+            NotificationCenter.default.removeObserver(token)
+            thermalToken = nil
+        }
     }
 
     // MARK: clamshell
@@ -200,7 +206,7 @@ public final class SystemObservers {
     // MARK: thermal
 
     private func startThermal() {
-        NotificationCenter.default.addObserver(
+        thermalToken = NotificationCenter.default.addObserver(
             forName: ProcessInfo.thermalStateDidChangeNotification,
             object: nil, queue: .main) { [weak self] _ in
                 self?.emit(.thermalChanged)

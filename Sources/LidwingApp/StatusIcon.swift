@@ -76,8 +76,8 @@ enum StatusIcon {
         let path = NSBezierPath()
         let width = box.width
         let height = box.height
-        func point(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
-            NSPoint(x: box.minX + x * width, y: box.minY + y * height)
+        func point(_ across: CGFloat, _ up: CGFloat) -> NSPoint {
+            NSPoint(x: box.minX + across * width, y: box.minY + up * height)
         }
 
         // Leading edge: a long sweep from the shoulder at the right down to the tip at the left.

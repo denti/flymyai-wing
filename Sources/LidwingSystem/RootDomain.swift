@@ -177,14 +177,21 @@ public enum AssertionInspector {
     /// The assertion name we look for. It must match `IdleLease.acquire` exactly.
     public static let ourAssertionName = "Lidwing is keeping this Mac awake"
 
+    /// `IOPMCopyAssertionsByProcess` answers through an out-parameter and returns an
+    /// `IOReturn`, unlike most Copy functions.
+    private static func assertionsByProcess() -> [NSNumber: [[String: Any]]]? {
+        var raw: Unmanaged<CFDictionary>?
+        guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess else { return nil }
+        return raw?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
+    }
+
     /// True when *this process* holds a `PreventUserIdleSystemSleep` assertion with our name.
     ///
     /// Never `IOPMCopyAssertionsStatus`: that counts configd's, powerd's and caffeinate's
     /// assertions together, and it will happily report success for us while we hold nothing.
     public static func ourAssertionLive(pid: Int32) -> Bool {
-        guard let raw = IOPMCopyAssertionsByProcess()?.takeRetainedValue()
-                as? [NSNumber: [[String: Any]]] else { return false }
-        guard let ours = raw[NSNumber(value: pid)] else { return false }
+        guard let byProcess = assertionsByProcess() else { return false }
+        guard let ours = byProcess[NSNumber(value: pid)] else { return false }
         return ours.contains { entry in
             (entry[kIOPMAssertionTypeKey as String] as? String)
                 == (kIOPMAssertPreventUserIdleSystemSleep as String)
@@ -198,10 +205,9 @@ public enum AssertionInspector {
     /// hold their own, and breaking someone else's assertion on the way past is worse than
     /// standing down.
     public static func foreignHolders(excluding pid: Int32) -> [ForeignHolder] {
-        guard let raw = IOPMCopyAssertionsByProcess()?.takeRetainedValue()
-                as? [NSNumber: [[String: Any]]] else { return [] }
+        guard let byProcess = assertionsByProcess() else { return [] }
         var holders: [ForeignHolder] = []
-        for (key, entries) in raw {
+        for (key, entries) in byProcess {
             let holderPID = key.int32Value
             guard holderPID != pid else { continue }
             for entry in entries {

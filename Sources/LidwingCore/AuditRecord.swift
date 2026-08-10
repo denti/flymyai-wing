@@ -56,39 +56,39 @@ public struct AuditRecord: Equatable, Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        armedAt = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .armedAt))
-        disarmedAt = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .disarmedAt))
-        reason = try c.decode(DisarmReason.self, forKey: .reason)
-        tier = try c.decode(Int.self, forKey: .tier)
-        minBatteryPercent = try c.decodeIfPresent(Int.self, forKey: .minBatteryPercent)
-        maxThermal = try c.decode(String.self, forKey: .maxThermal)
-        reasserts = try c.decode(Int.self, forKey: .reasserts)
-        sleepCountDelta = try c.decodeIfPresent(Int.self, forKey: .sleepCountDelta)
-        darkWakeCountDelta = try c.decodeIfPresent(Int.self, forKey: .darkWakeCountDelta)
-        groundTruthFailures = try c.decode(Int.self, forKey: .groundTruthFailures)
-        failures = try c.decodeIfPresent([AuditFailure].self, forKey: .failures) ?? []
-        os = try c.decode(String.self, forKey: .os)
-        arch = try c.decode(String.self, forKey: .arch)
-        appVersion = try c.decodeIfPresent(String.self, forKey: .appVersion) ?? "0.0.0"
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        armedAt = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .armedAt))
+        disarmedAt = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .disarmedAt))
+        reason = try container.decode(DisarmReason.self, forKey: .reason)
+        tier = try container.decode(Int.self, forKey: .tier)
+        minBatteryPercent = try container.decodeIfPresent(Int.self, forKey: .minBatteryPercent)
+        maxThermal = try container.decode(String.self, forKey: .maxThermal)
+        reasserts = try container.decode(Int.self, forKey: .reasserts)
+        sleepCountDelta = try container.decodeIfPresent(Int.self, forKey: .sleepCountDelta)
+        darkWakeCountDelta = try container.decodeIfPresent(Int.self, forKey: .darkWakeCountDelta)
+        groundTruthFailures = try container.decode(Int.self, forKey: .groundTruthFailures)
+        failures = try container.decodeIfPresent([AuditFailure].self, forKey: .failures) ?? []
+        os = try container.decode(String.self, forKey: .os)
+        arch = try container.decode(String.self, forKey: .arch)
+        appVersion = try container.decodeIfPresent(String.self, forKey: .appVersion) ?? "0.0.0"
     }
 
     public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(armedAt.timeIntervalSince1970.rounded(), forKey: .armedAt)
-        try c.encode(disarmedAt.timeIntervalSince1970.rounded(), forKey: .disarmedAt)
-        try c.encode(reason, forKey: .reason)
-        try c.encode(tier, forKey: .tier)
-        try c.encodeIfPresent(minBatteryPercent, forKey: .minBatteryPercent)
-        try c.encode(maxThermal, forKey: .maxThermal)
-        try c.encode(reasserts, forKey: .reasserts)
-        try c.encodeIfPresent(sleepCountDelta, forKey: .sleepCountDelta)
-        try c.encodeIfPresent(darkWakeCountDelta, forKey: .darkWakeCountDelta)
-        try c.encode(groundTruthFailures, forKey: .groundTruthFailures)
-        try c.encode(failures, forKey: .failures)
-        try c.encode(os, forKey: .os)
-        try c.encode(arch, forKey: .arch)
-        try c.encode(appVersion, forKey: .appVersion)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(armedAt.timeIntervalSince1970.rounded(), forKey: .armedAt)
+        try container.encode(disarmedAt.timeIntervalSince1970.rounded(), forKey: .disarmedAt)
+        try container.encode(reason, forKey: .reason)
+        try container.encode(tier, forKey: .tier)
+        try container.encodeIfPresent(minBatteryPercent, forKey: .minBatteryPercent)
+        try container.encode(maxThermal, forKey: .maxThermal)
+        try container.encode(reasserts, forKey: .reasserts)
+        try container.encodeIfPresent(sleepCountDelta, forKey: .sleepCountDelta)
+        try container.encodeIfPresent(darkWakeCountDelta, forKey: .darkWakeCountDelta)
+        try container.encode(groundTruthFailures, forKey: .groundTruthFailures)
+        try container.encode(failures, forKey: .failures)
+        try container.encode(os, forKey: .os)
+        try container.encode(arch, forKey: .arch)
+        try container.encode(appVersion, forKey: .appVersion)
     }
 
     public init(armedAt: Date, disarmedAt: Date, reason: DisarmReason, tier: Int,
@@ -174,6 +174,9 @@ public struct AuditSession: Equatable, Sendable {
         failures.filter { $0 == .sleptWhileArmed }.count
     }
 
+    // A record with fewer fields would be a record that cannot answer the question the soak
+    // asks of it, and grouping them into a parameter object would only move the count.
+    // swiftlint:disable:next function_parameter_count
     public func finish(at end: Date, reason: DisarmReason, tier: Int,
                        sleepCountDelta: Int?, darkWakeCountDelta: Int?,
                        os: String, arch: String, appVersion: String) -> AuditRecord {

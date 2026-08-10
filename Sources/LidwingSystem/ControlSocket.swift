@@ -60,7 +60,9 @@ public enum UnixSocket {
         guard bytes.count <= maximum else { return nil }
         withUnsafeMutablePointer(to: &address.sun_path) { pointer in
             pointer.withMemoryRebound(to: CChar.self, capacity: maximum + 1) { destination in
-                for (index, byte) in bytes.enumerated() { destination[index] = CChar(byte) }
+                for (index, byte) in bytes.enumerated() {
+                    destination[index] = CChar(bitPattern: byte)
+                }
                 destination[bytes.count] = 0
             }
         }

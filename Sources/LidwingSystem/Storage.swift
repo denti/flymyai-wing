@@ -58,10 +58,10 @@ public final class FileLedgerStore: LedgerStore {
         defer { close(descriptor) }
 
         try data.withUnsafeBytes { buffer in
+            guard let base = buffer.baseAddress else { return }
             var written = 0
             while written < buffer.count {
-                let result = Foundation.write(descriptor,
-                                              buffer.baseAddress!.advanced(by: written),
+                let result = Foundation.write(descriptor, base.advanced(by: written),
                                               buffer.count - written)
                 guard result > 0 else { throw LedgerError.cannotWrite(errno) }
                 written += result

@@ -60,8 +60,8 @@ public struct SemanticVersion: Equatable, Comparable, CustomStringConvertible, S
         var numbers: [Int] = []
         for part in parts {
             guard !part.isEmpty, part.allSatisfy({ $0.isASCII && $0.isNumber }),
-                  let n = Int(part) else { return nil }
-            numbers.append(n)
+                  let parsed = Int(part) else { return nil }
+            numbers.append(parsed)
         }
         while numbers.count < 3 { numbers.append(0) }
         self.init(numbers[0], numbers[1], numbers[2])

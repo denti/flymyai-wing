@@ -1,6 +1,5 @@
 import Foundation
 
-
 /// The text of the menu, computed from state. Pure, so the strings can be tested without a
 /// window server — which matters, because CI has no Aqua session and a screenshot proves
 /// nothing there.

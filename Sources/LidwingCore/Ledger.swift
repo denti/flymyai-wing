@@ -43,27 +43,27 @@ public struct Ledger: Equatable, Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        schema = try c.decode(Int.self, forKey: .schema)
-        bootSessionUUID = try c.decode(String.self, forKey: .bootSessionUUID)
-        capturedAt = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .capturedAt))
-        tier = try c.decode(Int.self, forKey: .tier)
-        weSetClamshellBit = try c.decode(Bool.self, forKey: .weSetClamshellBit)
-        weSetSleepDisabled = try c.decodeIfPresent(Bool.self, forKey: .weSetSleepDisabled) ?? false
-        reason = try c.decode(String.self, forKey: .reason)
-        appVersion = try c.decode(String.self, forKey: .appVersion)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schema = try container.decode(Int.self, forKey: .schema)
+        bootSessionUUID = try container.decode(String.self, forKey: .bootSessionUUID)
+        capturedAt = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .capturedAt))
+        tier = try container.decode(Int.self, forKey: .tier)
+        weSetClamshellBit = try container.decode(Bool.self, forKey: .weSetClamshellBit)
+        weSetSleepDisabled = try container.decodeIfPresent(Bool.self, forKey: .weSetSleepDisabled) ?? false
+        reason = try container.decode(String.self, forKey: .reason)
+        appVersion = try container.decode(String.self, forKey: .appVersion)
     }
 
     public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(schema, forKey: .schema)
-        try c.encode(bootSessionUUID, forKey: .bootSessionUUID)
-        try c.encode(capturedAt.timeIntervalSince1970.rounded(), forKey: .capturedAt)
-        try c.encode(tier, forKey: .tier)
-        try c.encode(weSetClamshellBit, forKey: .weSetClamshellBit)
-        try c.encode(weSetSleepDisabled, forKey: .weSetSleepDisabled)
-        try c.encode(reason, forKey: .reason)
-        try c.encode(appVersion, forKey: .appVersion)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schema, forKey: .schema)
+        try container.encode(bootSessionUUID, forKey: .bootSessionUUID)
+        try container.encode(capturedAt.timeIntervalSince1970.rounded(), forKey: .capturedAt)
+        try container.encode(tier, forKey: .tier)
+        try container.encode(weSetClamshellBit, forKey: .weSetClamshellBit)
+        try container.encode(weSetSleepDisabled, forKey: .weSetSleepDisabled)
+        try container.encode(reason, forKey: .reason)
+        try container.encode(appVersion, forKey: .appVersion)
     }
 
     public func encoded() throws -> Data {
