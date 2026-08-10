@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 3** · 2026-08-10
+**Cycle 4** · 2026-08-10
 
 ## PROVEN
 
@@ -11,7 +11,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **142 unit tests, 0 failures**, 1.2 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **162 unit tests, 0 failures**, 0.9 s on Linux; the same suite plus 20 macOS-only tests in CI.
 - **A `.dmg` exists.** `Scripts/build.sh` → `sign.sh` → `package.sh` → `invariants.sh` runs
   end to end on every push. All **14 artifact invariants** are green on the real artifact:
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
@@ -67,6 +67,9 @@ Nothing is idling on any of these.
 | Notify socket | `lidwing-notify` and the server that receives it. Invariant I8 enforced structurally: the receiver holds no reference through which it could arm anything |
 | Settings | A real window: mode, battery floor, duration, thermal guard, sound, and the agent integrations with their diff-before-write |
 | Release | `release.yml` — test, build, sign, notarize, staple, **then** attest and checksum |
+| Logging | A closed catalogue of 24 events, none below `.notice`, with the field allowlist unit-tested. `docs/SYMBOLICATE.md` turns any crash report a user pastes into a line number |
+| Localisation | Every user-visible string through one catalogue, with a full Russian translation. Two tests: every catalogue covers every key, and every translation keeps its placeholders |
+| Security | `SECURITY.md`: three surfaces, four mechanisms against the one failure mode that matters |
 
 ## Decisions recorded
 
@@ -95,7 +98,6 @@ Eleven rejected findings are recorded with their reasons.
 
 1. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
    measurement, and `AUDIT.md` says so rather than quoting budgets as results.
-2. Localisation scaffolding — every user-visible string through `String(localized:)`.
-3. The real README with the four falsify-us commands and the compatibility table — last, per
+2. The real README with the four falsify-us commands and the compatibility table — last, per
    `DECISIONS.md`, and only listing combinations with a green acceptance run.
 4. Everything blocked on a Mac: M0, fault injection, the perf gate, the smoke script.

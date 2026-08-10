@@ -16,14 +16,15 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **142** |
+| Tests | **162** |
 | Failures | 0 |
 | Wall clock | 0.83 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
 
-Breakdown: StateMachine 35 · ClaudeSettingsPatch and CodexConfigPatch 23 · SafetyPolicy 17 ·
-WatchdogPolicy 13 · Ledger and AuditRecord 13 · MenuPresenter 9 · Uninstall 8 · FirstRunCopy 6 ·
-Version 5 · WingGeometry 5. `LidwingSystemTests` adds 9 more on macOS only (§2).
+Breakdown: StateMachine 40 · ClaudeSettingsPatch and CodexConfigPatch 23 · SafetyPolicy 17 ·
+WatchdogPolicy 13 · Ledger and AuditRecord 13 · Strings and Translations 12 · MenuPresenter 9 ·
+LogEvent 8 · Uninstall 8 · FirstRunCopy 6 · Version 5 · WingGeometry 5. `LidwingSystemTests`
+adds 20 more on macOS only (§2).
 
 ### Positive control — observed, not asserted
 
@@ -54,7 +55,7 @@ its own bookkeeping:
 | 6 | `CodexConfigPatch.install` writes our command without chaining | silently taking away a feature the user already had | **2** |
 | 7 | Repair calls `setClamshellSleepDisabled(false)` instead of `repairClamshellState()` | the original defect from audit round 3: the button reports success and changes nothing | **3** |
 
-Each was applied, measured, and reverted; the suite returned to **142 passed, 0 failed** after
+Each was applied, measured, and reverted; the suite returned to **162 passed, 0 failed** after
 every one.
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
@@ -74,7 +75,7 @@ Broadening that coverage is on the list in §6.
 | | |
 |---|---|
 | Command | `swift test` on `macos-15` |
-| Tests | **9** (`ControlSocketTests` 6, `StorageTests` 3) on top of the 84 shared with Linux |
+| Tests | **20** (`ControlSocketTests` 6, `NotifyServerTests` 8, `StorageTests` 3, `IntegrationInstallerTests` 7) on top of the 162 shared with Linux |
 | Covers | the control-socket wire format, an `AF_UNIX` loopback, socket permissions, the ledger's temp-file-plus-`rename` write, the audit log's append and read-back |
 | Cannot cover | anything needing a lid, a battery, a real power event, or a window server (§5) |
 
