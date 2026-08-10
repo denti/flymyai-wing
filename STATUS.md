@@ -22,7 +22,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   flaky against a 2x timing margin and is now 10 ms against 100 ms with retries, proven still
   able to catch the defect it exists for.
 - **A `.dmg` exists.** `Scripts/build.sh` → `sign.sh` → `package.sh` → `invariants.sh` runs
-  end to end on every push. All **14 artifact invariants** are green on the real artifact:
+  end to end on every push. All **15 artifact invariants** are green on the real artifact:
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.

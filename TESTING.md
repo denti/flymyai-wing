@@ -162,7 +162,7 @@ user's agent, and actually gets the data.
 | Documented numbers | `./Scripts/check-documented-numbers.sh` | pass | Five controls red, one of which was live in the repository: TESTING.md claimed a `StorageTests` file that did not exist, a total of 20 against 27 actual, and a breakdown that summed to 24. |
 | Modals activate first | `./Scripts/check-core-purity.sh` | pass, 12 call sites | Written after finding the un-activated "already running" alert by hand; it then found a **second** one I had missed in the same by-hand pass. Removing either `NSApp.activate` turns it red. |
 | Bundle contract | `./Scripts/check-bundle-contract.sh` | pass | Five controls, each proven red: the watchdog renamed in the build, the helper dropped from signing, a bundle id drifting in a workflow, the constant made unextractable, the agent plist missing from the build. Two of the five failed first time because of defects **in the check** - see `AUDIT.md` round 8. |
-| Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |
+| Artifact invariants | `./Scripts/invariants.sh` | **15 of 15 green** on the real artifact, run 31428574074 | Written before the first artifact existed, deliberately. The script now counts its own checks and refuses to report success if fewer ran than the bundle has invariants - and CI proves that guard on every build by running the script a second time with an impossible expected count and requiring it to fail. It cannot be exercised from Linux: there is no `lipo`, `codesign` or `plutil` here, so it dies long before reaching the guard. |
 
 ```
 $ sed -i '1i import AppKit' Sources/LidwingCore/Version.swift

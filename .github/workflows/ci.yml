@@ -253,6 +253,19 @@ jobs:
         env:
           SIGN_ID: ${{ secrets.MACOS_SIGN_IDENTITY }}
         run: ./Scripts/package.sh
+      # The positive control for the guard below, run every time rather than once by hand: with
+      # an impossible expected count the script must refuse. If this step ever passes, the
+      # "invariants OK" line above it stopped meaning anything.
+      - name: The invariants refuse an incomplete run
+        shell: bash
+        run: |
+          if EXPECTED_CHECKS=999 ./Scripts/invariants.sh > /tmp/incomplete.log 2>&1; then
+            echo "the incompleteness guard did not fire"
+            tail -5 /tmp/incomplete.log
+            exit 1
+          fi
+          grep -q "INVARIANTS INCOMPLETE" /tmp/incomplete.log
+          echo "ok: the guard fires when fewer checks run than expected"
       - name: Artifact invariants
         run: ./Scripts/invariants.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4

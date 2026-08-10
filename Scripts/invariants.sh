@@ -13,8 +13,21 @@ MIN="${MACOS_MIN:-12.0}"
 BUNDLE="dist/$APP.app"
 BINARY="$BUNDLE/Contents/MacOS/$APP"
 FAIL=0
+CHECKS=0
+
+# The number of invariants this script is expected to run. It exists so the script can apply
+# this project's own rule to itself: a run that checked nothing must not report success. An
+# early `exit` on a missing file, or a `for` loop over nested binaries that found none, would
+# otherwise print a short list of passes and a cheerful final line.
+#
+# Overridable so the guard can be *proven* rather than asserted: CI runs this script a second
+# time with an impossible number and requires it to fail. A gate nobody has watched fail is a
+# gate of unknown value, and this one cannot be exercised from Linux - there is no `lipo`,
+# `codesign` or `plutil` here, so the script dies long before it reaches this line.
+EXPECTED_CHECKS="${EXPECTED_CHECKS:-15}"
 
 check() {
+  CHECKS=$((CHECKS + 1))
   if [ "$1" -eq 0 ]; then
     echo "  ok    $2"
   else
@@ -107,6 +120,15 @@ if [ -e "/Library/LaunchDaemons/ai.flymy.lidwing.helper.plist" ] \
   check 1 "no legacy privileged-helper artifacts on this machine"
 else
   check 0 "no legacy privileged-helper artifacts on this machine"
+fi
+
+echo "SUMMARY invariants=$CHECKS fail=$FAIL"
+
+# Empty is never success. If fewer checks ran than this artifact has invariants, something
+# returned early and the passes above describe a fraction of the bundle.
+if [ "$CHECKS" -lt "$EXPECTED_CHECKS" ]; then
+  echo "INVARIANTS INCOMPLETE: ran $CHECKS of $EXPECTED_CHECKS - this proved less than it claims"
+  exit 1
 fi
 
 if [ "$FAIL" -ne 0 ]; then
