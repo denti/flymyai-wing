@@ -16,14 +16,14 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **84** |
+| Tests | **135** |
 | Failures | 0 |
-| Wall clock | 0.70 s |
+| Wall clock | 0.83 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
 
-Breakdown, as reported by the runner: StateMachine 35 · SafetyPolicy 17 · Ledger and
-AuditRecord 13 · MenuPresenter 9 · Version 5 · WingGeometry 5. `LidwingSystemTests` adds 9 more
-on macOS only (§2).
+Breakdown: StateMachine 35 · ClaudeSettingsPatch and CodexConfigPatch 23 · SafetyPolicy 17 ·
+WatchdogPolicy 13 · Ledger and AuditRecord 13 · MenuPresenter 9 · Uninstall 8 · FirstRunCopy 6 ·
+Version 5 · WingGeometry 5. `LidwingSystemTests` adds 9 more on macOS only (§2).
 
 ### Positive control — observed, not asserted
 
@@ -50,8 +50,10 @@ its own bookkeeping:
 | 2 | `PowerSample.percentage` returns `current` instead of `current * 100 / max` | the raw-mAh bug: a 20 % floor that never fires | **14** |
 | 3 | `verifyTick` calls `completeArming()` without reading ground truth | believing a write that returned success while doing nothing | **9** |
 | 4 | `releaseMechanism` drops the `weSetTheBit` and desktop-mode guards | invariant I7: clearing a bit powerd owns | **1** |
+| 5 | `ClaudeSettingsPatch.install` appends without removing our previous entry | a second hook on every install, and a duplicate notification for every event | **3** |
+| 6 | `CodexConfigPatch.install` writes our command without chaining | silently taking away a feature the user already had | **2** |
 
-Each was applied, measured, and reverted; the suite returned to **84 passed, 0 failed** after
+Each was applied, measured, and reverted; the suite returned to **135 passed, 0 failed** after
 every one.
 
 **Mutation 4 is the thin one, and it is worth saying so.** Exactly one test
@@ -87,7 +89,7 @@ weaker test would have skipped over.
 | Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
 | Lint | `swiftlint lint --strict` | **0 violations in 72 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
 | Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
-| Artifact invariants | `./Scripts/invariants.sh` | *pending the first packaged build* | Written before the first artifact exists, deliberately. |
+| Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |
 
 ```
 $ sed -i '1i import AppKit' Sources/LidwingCore/Version.swift
@@ -103,6 +105,28 @@ exit=0
 
 The script also refuses to pass when it scanned no files at all, so a rename that empties its
 search path fails loudly instead of quietly reporting success.
+
+### Measured on the first packaged artifact
+
+```
+archs: x86_64 arm64
+ok    universal: both arm64 and x86_64 slices present
+ok    minos 12.0 on both slices (found 2)
+ok    concurrency runtime is hard-linked, not weak
+ok    Resources/lidwingd is universal
+ok    Resources/lidwing-notify is universal
+ok    signature verifies (deep, strict)
+ok    LSUIElement is true (menu-bar only, no Dock icon)
+ok    LSMinimumSystemVersion is 12.0
+ok    a second instance is prohibited
+ok    CFBundleVersion is zero-padded to ten digits (got '0000000011')
+ok    Info.plist declares no *UsageDescription keys
+ok    no network-client entitlement
+ok    the bundle declares no entitlements at all
+```
+
+`dist/Lidwing-0.0.0.dmg`, SHA-256 `19727480d72584c0…`. Ad-hoc signed: Gatekeeper will refuse it
+until the Developer ID exists, and `INSTALL.md` says exactly what that costs a user.
 
 ---
 
@@ -147,6 +171,9 @@ Named so that their absence is visible rather than implied:
 - The compatibility matrix run.
 - The uninstaller, and the before/after diff that proves it left nothing.
 - A second, independent test of invariant I7 (see mutation 4 above).
+- The file-writing half of the config patchers: backup, `fchmod` to the original mode, temp
+  file in the same directory, `rename(2)`. The *transformations* are tested exhaustively; the
+  I/O around them is not yet.
 
 ---
 
