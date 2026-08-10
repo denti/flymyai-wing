@@ -135,6 +135,11 @@ public enum LogCatalogue {
 
     // MARK: third-party files
 
+    /// The advisory notify socket could not be created, so hook notifications will never
+    /// arrive. Not fatal - nothing about protection depends on it - but never silent.
+    public static let notifyServerUnavailable = LogEvent(
+        name: "notify_server_unavailable", level: .error,
+        publicFields: [])
     public static let integrationInstalled = LogEvent(
         name: "integration.installed", level: .notice,
         publicFields: ["agent", "chained"])
@@ -156,7 +161,7 @@ public enum LogCatalogue {
         thermalState, batteryGuard,
         watchdogConnected, watchdogLost, watchdogRecovered,
         ledgerWritten, ledgerWriteFailed,
-        integrationInstalled, integrationRemoved, integrationRefused,
+        notifyServerUnavailable, integrationInstalled, integrationRemoved, integrationRefused,
         uninstallComplete
     ]
 

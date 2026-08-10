@@ -527,7 +527,40 @@ The first version of the pipefail check searched the twelve preceding lines for 
 block scalars properly, and all three shapes - a masked one-liner, a block with its `pipefail`
 deleted, and the canary restored to its old form - have been seen red.
 
-**Round 9 verdict:** six defects, none capable of stranding a Mac, three of them about other
+### 9.7 — the one that was hiding behind 9.5
+
+Fixing the masked pipes turned `test-macos` red immediately, and reading back through the logs
+it had been red all along:
+
+| Run | Reported | Actually |
+|---|---|---|
+| `7239296` | success | 201 tests, **5 failures** |
+| `93c66a3` | success | 209 tests, **5 failures** |
+| `eaa417c` | success | 230 tests, **5 failures** |
+| `98403cf` | success | 238 tests, **5 failures** |
+
+Two `NotifyServerTests` cases built their socket path from `NSTemporaryDirectory()`, which on a
+CI runner is `/var/folders/_5/<hash>/T/` - 48 characters before anything of ours. With a full
+UUID the paths came to **105 and 110 bytes** against a `sun_path` that holds 103 plus a NUL, so
+`makeAddress` refused them exactly as it is designed to, `start()` returned false, and both
+tests failed. The `sun_path` guard that caused this is the round 7 fix; I applied its lesson to
+the shell test and not to the Swift one.
+
+The product path is fine and was never at risk: `~/Library/Application Support/Lidwing/
+notify.sock` stays under the limit for any username macOS permits. So this was a defect in the
+tests - but "the hidden failures turned out to be harmless" is luck, and the reason it stayed
+hidden for weeks is not.
+
+Fixed: short paths, and the test now asserts its own path length so a future creep says what it
+is instead of looking like a broken server. A failed `NotifyServer.start()` is now logged rather
+than ignored, because an advisory feature that silently does not exist is the hardest kind to
+diagnose from a support report. And the CI guard gained a second, independent check for reported
+failures that does not depend on an exit code at all.
+
+**The lesson, stated plainly:** every "CI is green" in this repository before `e3d5a9b` was
+worth less than it claimed, and `STATUS.md` has been corrected rather than quietly updated.
+
+**Round 9 verdict:** seven defects, none capable of stranding a Mac, three of them about other
 accounts on a shared Mac rather than about the same-uid attacker this product cannot defend
 against and does not claim to. The fourth was a document quietly claiming things that were not
 true, which in this project is a defect like any other.

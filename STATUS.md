@@ -7,10 +7,12 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
 
 ## PROVEN
 
-- **CI is green on every job**: `core-linux`, `core-purity`, `test-macos` (macOS 15),
-  `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
-  layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
-  its tests pass on both macOS 15 and macOS 26.
+- **CI is green on every job** — and, for the first time, that sentence means something. Until
+  commit `e3d5a9b` the macOS jobs piped `swift test` into `tee` with no `pipefail`, so `tee`
+  decided the exit code and **five failing tests reported success on every run for weeks**. The
+  claim that used to sit here was false, and it was false in the way that matters: it was
+  checkable, and nothing checked it. Both failures were the test's own socket path exceeding
+  `sun_path` on a CI runner, not a product defect - but that is luck, not diligence.
 - **216 unit tests, 0 failures**, 1.3 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
@@ -53,6 +55,15 @@ Nothing is red.
   no rentable Mac on Earth has a hinge.
 - **T5, partially open** — USPTO search for "Lidwing". Every other registry is clear. Blocks
   the first published build, not development.
+- **Low Power Mode cannot be written without root** — and it is a Denis override, default ON
+  ([0004](docs/decisions/0004-low-power-mode.md)), against a Tier 1 architecture with no
+  privileges at all ([0002](docs/decisions/0002-mechanism-authority.md)). `ADDENDUM.md` §W4 puts
+  `pmset -b/-c lowpowermode` inside the privileged helper and `CRAFT.md` §733 calls it a
+  privileged write. Escalated as [0010](docs/decisions/0010-low-power-mode-needs-a-privilege-this-tier-does-not-have.md);
+  the choice between dropping it, guiding the user to the Battery pane once, or shipping a root
+  helper is a product call. **H9** settles the premise itself in thirty seconds on a real Mac,
+  because every source for it is a document rather than a run. No half-toggle ships meanwhile:
+  a checkbox that appears to engage Low Power Mode and does not is worse than its absence.
 - **H4** — Apple Developer Program. Multi-week lead time, blocks anyone but Denis installing a
   build. Development continues without it; `sign.sh` takes the identity the moment it exists.
 

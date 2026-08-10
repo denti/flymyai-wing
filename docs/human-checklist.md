@@ -286,6 +286,33 @@ it says. Zero warnings is the target; a contrast failure is a real finding, not 
 
 ---
 
+## H9 — Can an ordinary user turn on Low Power Mode? · 30 seconds · **settles a blocker**
+
+This is the whole question behind `docs/decisions/0010`. Three documents say writing Low Power
+Mode is a privileged operation, and a document is not a measurement. One command decides it.
+
+```bash
+# NOT with sudo. As you, normally.
+pmset -b lowpowermode 1; echo "exit=$?"
+# then read back, whatever it printed:
+pmset -g custom | grep -i lowpowermode
+```
+
+**Expected, if the documents are right:** it refuses, with something like
+`pmset: Error, must be run as root...`, and the value in `pmset -g custom` is unchanged.
+
+**Send:** the exact output of both commands, including the exit code.
+
+If it *succeeded* without sudo, say so plainly - that would mean Low Power Mode ships exactly as
+you specified it, default ON, and decision 0010 is void. If it refused, the choice in 0010 is
+yours: drop the feature, take the user to the Battery pane once and let them do it, or accept a
+privileged helper.
+
+**Your own machine, before you run it:** `pmset -g custom | grep -i lowpowermode` first, and put
+it back afterwards if the command changed anything. Both of your sources are currently `1`.
+
+---
+
 *Not on this list, deliberately: buying an Intel MacBook, renting monthly Mac hosting, an AWS
 account, or a crash-reporting plan. None of them is needed, and the reasoning is in
 `ADDENDUM.md` §3.*

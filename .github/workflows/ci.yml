@@ -59,6 +59,11 @@ jobs:
           COUNT=$(grep -Eo 'Executed [0-9]+ tests' linux-test.log | tail -1 | grep -Eo '[0-9]+')
           echo "collected $COUNT tests"
           test "$COUNT" -ge 40
+          if grep -qE 'with [1-9][0-9]* failures?' linux-test.log; then
+            grep -E 'with [1-9][0-9]* failures?' linux-test.log | tail -3
+            echo "the suite reported failures"
+            exit 1
+          fi
       # The hook helper's contract is about timing and exit codes, which no Swift test can
       # check. It is plain POSIX C, so it runs here rather than waiting for a macOS runner.
       - name: Notify-helper behaviour
@@ -137,6 +142,14 @@ jobs:
           COUNT=$(grep -Eo 'Executed [0-9]+ tests' macos-test.log | tail -1 | grep -Eo '[0-9]+')
           echo "collected $COUNT tests"
           test "$COUNT" -ge 40
+          # A second, independent signal. `swift test`'s exit code is the primary one and now
+          # reaches the step properly, but this suite reported 5 failures on every run for weeks
+          # while the job went green, so it gets a check that does not depend on an exit code.
+          if grep -qE 'with [1-9][0-9]* failures?' macos-test.log; then
+            grep -E 'with [1-9][0-9]* failures?' macos-test.log | tail -3
+            echo "the suite reported failures"
+            exit 1
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
         if: always()
         with:

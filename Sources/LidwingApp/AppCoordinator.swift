@@ -99,8 +99,14 @@ final class AppCoordinator {
         let notify = NotifyServer { [weak self] signal in
             self?.agentSignalled(signal)
         }
-        notify.start()
-        notifyServer = notify
+        // Advisory, but not silent. If the socket cannot be created the agent-waiting
+        // notification simply never arrives, and a feature that quietly does not exist is the
+        // hardest kind to diagnose from a support report.
+        if notify.start() {
+            notifyServer = notify
+        } else {
+            log.emit(LogCatalogue.notifyServerUnavailable, .integrations)
+        }
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
             as? String ?? "0.0.0"

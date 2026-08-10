@@ -63,8 +63,28 @@ final class NotifyServerTests: XCTestCase {
         }
     }
 
+    /// A socket path short enough to exist.
+    ///
+    /// `NSTemporaryDirectory()` on a CI runner is `/var/folders/_5/<hash>/T/`, 48 characters
+    /// before anything of ours is added - and `sun_path` holds 103 bytes plus a NUL on macOS.
+    /// The two tests below used that directory with a full UUID and came to 105 and 110 bytes,
+    /// so `makeAddress` refused them, `start()` returned false, and both tests failed on every
+    /// macOS run for weeks while the job reported success, because the `| tee` in the workflow
+    /// let `tee` decide the exit code.
+    ///
+    /// The length is asserted rather than assumed: if this ever creeps back over the limit, the
+    /// failure should say so instead of looking like a broken server.
+    private func shortSocketPath(_ tag: String, file: StaticString = #filePath,
+                                 line: UInt = #line) -> String {
+        let path = "/tmp/lw-\(tag)-\(UUID().uuidString.prefix(8)).sock"
+        XCTAssertLessThan(path.utf8.count, 104,
+                          "the test's own socket path is too long for sun_path",
+                          file: file, line: line)
+        return path
+    }
+
     func testTheSocketIsPrivateAndIsRemovedOnStop() throws {
-        let path = NSTemporaryDirectory() + "lidwing-notify-\(UUID().uuidString).sock"
+        let path = shortSocketPath("priv")
         let server = NotifyServer(socketPath: path) { _ in }
         XCTAssertTrue(server.start())
 
@@ -78,7 +98,7 @@ final class NotifyServerTests: XCTestCase {
     }
 
     func testAMessageDeliveredOverTheRealSocketArrives() throws {
-        let path = NSTemporaryDirectory() + "lidwing-notify-live-\(UUID().uuidString).sock"
+        let path = shortSocketPath("live")
         let received = expectation(description: "signal delivered")
         var signal: NotifyServer.Signal?
 
