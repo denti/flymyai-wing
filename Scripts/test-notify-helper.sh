@@ -136,6 +136,17 @@ int main(int argc, char **argv) {
     strncpy(address.sun_path, argv[1], sizeof(address.sun_path) - 1);
     if (bind(server, (struct sockaddr *)&address, sizeof(address)) < 0) return 4;
     if (listen(server, 4) < 0) return 5;
+    /* Say we are ready only once we are actually accepting. The socket file appears at bind,
+     * and a caller that waits for it can connect in the window before listen and be refused.
+     * The window is microseconds, which is exactly the kind of race that fails once a month
+     * on somebody else's machine. */
+    {
+        char ready[1200];
+        FILE *flag;
+        snprintf(ready, sizeof(ready), "%s.ready", argv[1]);
+        flag = fopen(ready, "w");
+        if (flag) fclose(flag);
+    }
 
     client = accept(server, NULL, NULL);
     if (client < 0) return 6;
@@ -151,12 +162,17 @@ int main(int argc, char **argv) {
 }
 CSRC
 "$CC" -O2 -o "$WORK/listener" "$WORK/listener.c" || { echo "  FAIL  listener will not build"; exit 1; }
+# Clear the flag *before* starting the listener. Clearing it afterwards races the listener that
+# is already writing it, and then waits five seconds for a flag that was deleted a moment after
+# it appeared.
+rm -f "$SOCKET.ready"
 "$WORK/listener" "$SOCKET" "$RECEIVED" &
 LISTENER=$!
 
-# Wait for the socket to exist rather than sleeping a guessed amount.
+# Wait for the listener to say it is accepting, rather than sleeping a guessed amount - and
+# rather than waiting for the socket file, which appears one call earlier, at bind.
 for _ in $(seq 1 50); do
-  [ -S "$SOCKET" ] && break
+  [ -f "$SOCKET.ready" ] && break
   sleep 0.1
 done
 
@@ -224,11 +240,11 @@ fi
 # either way, so a degraded machine is visible instead of silently tolerated.
 slow_writer_attempt() {
   local delay="$1" received="$2"
-  rm -f "$received" "$SOCKET"
+  rm -f "$received" "$SOCKET" "$SOCKET.ready"
   "$WORK/listener" "$SOCKET" "$received" &
   local listener=$!
   local waited=0
-  while [ ! -S "$SOCKET" ] && [ "$waited" -lt 50 ]; do
+  while [ ! -f "$SOCKET.ready" ] && [ "$waited" -lt 50 ]; do
     sleep 0.1
     waited=$((waited + 1))
   done

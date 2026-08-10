@@ -122,6 +122,7 @@ on Linux as well as macOS and is part of the ordinary pre-push gate.
 | Binary size | **12 528 bytes** |
 | Warnings | none, at `-Wall -Wextra -Werror` |
 | **Time with no listener** | **4 ms** (budget 150 ms) |
+| Readiness | The listener now writes a `.ready` flag **after** `listen()`, and the script waits for that rather than for the socket file, which appears one call earlier at `bind()`. Removes a microsecond-wide connect-refused window. **No positive control**: deleting the signal leaves the suite green, because the five-second wait loop times out and proceeds by which point the listener is accepting anyway. It removes a race; it is not proven to. |
 | Flake fixed | The slow-writer case delayed the payload 50 ms against the helper's **100 ms** budget - a 2x margin, which a loaded CI runner overran for real in run 31427570805. Now 10 ms, and it retries: a non-blocking read loses the payload on *every* attempt, so retrying cannot hide the defect. Verified by restoring the non-blocking read - it failed all three attempts. |
 
 The no-listener case is the one that happens most, because the app usually is not running. Exit
