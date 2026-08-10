@@ -25,6 +25,14 @@ if grep -rEn '(Process\(\)|posix_spawn|/usr/bin/pmset|/usr/sbin/ioreg|NSTask)' "
   FAIL=1
 fi
 
+# Swift has no stored properties in extensions, and the Darwin-only targets are not compiled
+# on Linux — so this class of error would reach a macOS runner before anyone saw it. One grep
+# is cheaper than a round trip.
+if grep -rEn '^    (var|let) [a-zA-Z_]+ *(:|=)' Sources/*/*+*.swift 2>/dev/null; then
+  echo "FAIL: a stored property in an extension file (above). Swift does not allow that."
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   # Assert on real output, never on the absence of an error: prove we actually looked at files.
   COUNT=$(find "$CORE" -name '*.swift' | wc -l | tr -d ' ')
