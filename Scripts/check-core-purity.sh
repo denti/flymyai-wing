@@ -55,6 +55,27 @@ for split in Sources/*/*+*.swift; do
            | awk '{print $NF}')
 done
 
+# ---------------------------------------------------------------------------------------
+# 4. Log events must be named through LogCatalogue in the Darwin modules.
+#
+# `log.emit(.osChanged, ...)` looks right and compiles nowhere: leading-dot lookup resolves
+# against the parameter type `LogEvent`, and the events are static members of `LogCatalogue`.
+# Cost me a full CI round trip, because none of the Darwin targets compile on Linux - CI is
+# their only compiler, so a six-minute round trip is the price of every typo in them. This grep
+# is not a substitute for that compiler; it just stops this particular one from recurring.
+for file in Sources/LidwingApp/*.swift Sources/LidwingSystem/*.swift Sources/lidwingd/*.swift; do
+  [ -f "$file" ] || continue
+  # Anchored on the log receiver. A bare `\.emit\(\.` also matches `Observers.emit(.thermalChanged)`,
+  # which is a different, entirely correct method - and a check that fires on correct code gets
+  # switched off within a week.
+  if grep -nE '(^|[^A-Za-z0-9_])(log|Log\.shared)\.emit\(\.' "$file"; then
+    echo "FAIL: $file names a log event with a leading dot."
+    echo "      Use LogCatalogue.<event>: leading-dot lookup resolves against LogEvent, which"
+    echo "      has no such member, and no Linux build will ever tell you."
+    FAIL=1
+  fi
+done
+
 if [ "$FAIL" -eq 0 ]; then
   # Assert on real output, never on the absence of an error: prove we actually looked at files.
   COUNT=$(find "$CORE" -name '*.swift' | wc -l | tr -d ' ')

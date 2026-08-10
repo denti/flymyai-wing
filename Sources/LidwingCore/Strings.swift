@@ -81,6 +81,17 @@ public enum StringKey {
         StringEntry("notify.osRechecked.body", "Checked against %1$@ just now, not assumed.",
          "%1$@ is a macOS version string such as \"Version 15.6 (Build 24G84)\"."),
 
+        StringEntry("settings.sound.play", "Play the Lid-Close Sound",
+         "Button that plays the confirmation sound so the user can verify it works. Title case."),
+        StringEntry("settings.sound.play.detail",
+         "Plays it now, even if the sound is switched off above.",
+         "Explanation under the Play button."),
+        StringEntry("settings.sound.missing",
+         "This Mac is missing the sounds Lidwing uses (%1$@). "
+         + "Lid-close confirmation will be silent.",
+         "%1$@ is a comma-separated list of internal chime names. Shown only when sounds are "
+         + "genuinely absent."),
+
         // Menu — the entire visible surface of the product.
         StringEntry("menu.toggle", "Keep Awake with the Lid Closed",
          "The one command in the menu. Title case."),

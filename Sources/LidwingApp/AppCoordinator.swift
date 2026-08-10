@@ -70,7 +70,7 @@ final class AppCoordinator {
         if case .changed(let from, let to) = OSChangeWatch.compare(
             lastVerifiedOS: preferences.lastVerifiedOS,
             current: ProcessInfo.processInfo.operatingSystemVersionString) {
-            Log.shared.emit(.osChanged, .lifecycle, ["from": from, "to": to])
+            Log.shared.emit(LogCatalogue.osChanged, .lifecycle, ["from": from, "to": to])
         }
         chimes.enabled = preferences.soundEnabled
 
@@ -285,6 +285,14 @@ final class AppCoordinator {
         onStateChange?()
     }
 
+    // MARK: sound self-check
+
+    /// What is wrong with sound on this Mac, in the user's words, or nil when nothing is.
+    var soundSelfCheckWarning: String? { chimes.selfCheckWarning }
+
+    /// Plays the lid-close chime because the user asked to hear it.
+    func previewChime() { chimes.preview(.sealed) }
+
     // MARK: effects out
 
     /// Performs one effect. Returns whether the menu has to be rebuilt afterwards.
@@ -318,7 +326,7 @@ final class AppCoordinator {
             endActivity()
         case .recordVerifiedOS(let os):
             preferences.lastVerifiedOS = os
-            log.emit(.osRecheckPassed, .lifecycle, ["to": os])
+            log.emit(LogCatalogue.osRecheckPassed, .lifecycle, ["to": os])
         case .showForeignHolder, .uiNeedsRefresh:
             return true
         }

@@ -122,16 +122,7 @@ final class SettingsWindowController: NSWindowController {
             Strings.text("settings.thermal.detail",
                          "A closed lid blocks airflow. Lidwing stops before your Mac overheats.")))
 
-        stack.addArrangedSubview(separator())
-        stack.addArrangedSubview(sectionHeader(Strings.text("settings.sound", "Sound")))
-
-        soundCheckbox.target = self
-        soundCheckbox.action = #selector(settingsChanged)
-        stack.addArrangedSubview(withExplanation(
-            soundCheckbox,
-            Strings.text("settings.sound.detail",
-                         "You can't see the screen with the lid closed, "
-                         + "so Lidwing says it out loud.")))
+        for view in soundSection() { stack.addArrangedSubview(view) }
 
         stack.addArrangedSubview(separator())
         for view in agentsSection() { stack.addArrangedSubview(view) }
@@ -192,6 +183,52 @@ final class SettingsWindowController: NSWindowController {
             views.append(row)
         }
         return views
+    }
+
+    /// The sound section, extracted when `buildContent` outgrew its length budget - which is a
+    /// fair signal here, because this section stopped being one checkbox and became a feature
+    /// with a self-check.
+    private func soundSection() -> [NSView] {
+        var views: [NSView] = []
+        views.append(separator())
+        views.append(sectionHeader(Strings.text("settings.sound", "Sound")))
+
+        soundCheckbox.target = self
+        soundCheckbox.action = #selector(settingsChanged)
+        views.append(withExplanation(
+            soundCheckbox,
+            Strings.text("settings.sound.detail",
+                         "You can't see the screen with the lid closed, "
+                         + "so Lidwing says it out loud.")))
+
+        // A Play button, because "the sound options are still there and no sound comes out" is
+        // the top negative review of the closest comparable app. Sound is not decoration here:
+        // with the lid shut it is the only channel this product has, so the user gets to answer
+        // "does this actually work on my Mac" with their own ears rather than trusting a
+        // checkbox.
+        let play = NSButton(title: Strings.text("settings.sound.play", "Play the Lid-Close Sound"),
+                            target: self, action: #selector(playSound))
+        play.bezelStyle = .rounded
+        attachExplanation(Strings.text("settings.sound.play.detail",
+                                       "Plays it now, even if the sound is switched off above."),
+                          to: play)
+        views.append(play)
+
+        // The self-check. Shown only when something is actually wrong: a check that reports
+        // success on every launch trains people to stop reading it.
+        if let warning = coordinator.soundSelfCheckWarning {
+            let field = NSTextField(labelWithString: warning)
+            field.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            field.textColor = .systemOrange
+            field.lineBreakMode = .byWordWrapping
+            field.preferredMaxLayoutWidth = 400
+            views.append(field)
+        }
+        return views
+    }
+
+    @objc private func playSound() {
+        coordinator.previewChime()
     }
 
     private func sectionHeader(_ text: String) -> NSTextField {

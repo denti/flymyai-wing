@@ -62,6 +62,11 @@ public enum Translations {
         "notify.osRechecked.title": "macOS обновилась, Lidwing по-прежнему работает",
         "notify.osRechecked.body": "Только что проверено на %1$@, а не предположено.",
 
+        "settings.sound.play": "Проиграть звук закрытия крышки",
+        "settings.sound.play.detail": "Проиграет сейчас, даже если звук выше выключен.",
+        "settings.sound.missing": "На этом Mac нет звуков, которые использует Lidwing (%1$@). "
+            + "Подтверждения при закрытии крышки не будет слышно.",
+
         "menu.toggle": "Не спать с закрытой крышкой",
         "menu.off": "Выключено - Mac засыпает как обычно",
         "menu.awake": "Не спит - можно закрывать крышку",

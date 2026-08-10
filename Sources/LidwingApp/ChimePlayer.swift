@@ -24,12 +24,26 @@ final class ChimePlayer {
     private var identifiers: [Chime: SystemSoundID] = [:]
     /// Whether the user wants sound at all.
     var enabled = true
+    /// Chimes for which no stock sound could be found on this Mac. Reported, never swallowed:
+    /// with the lid shut, sound is the only channel this product has.
+    private(set) var missing: [Chime] = []
 
-    init() {
-        prepare(.sealed, file: "Submarine")
-        prepare(.standingDown, file: "Bottle")
-        prepare(.failure, file: "Basso")
-        prepare(.agentWaiting, file: "Ping")
+    init(exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) {
+        let chosen = ChimeCatalogue.resolve(exists: exists)
+        for (chime, file) in chosen {
+            prepare(chime, file: file)
+        }
+        // Two ways to end up without a sound: nothing on disk, and a file that AudioToolbox
+        // refused. Both are reported, because both are silent to the user in exactly the same
+        // way - and the second one is the sort that appears after an OS update.
+        missing = ChimeCatalogue.candidates.keys
+            .filter { identifiers[$0] == nil }
+            .sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// The self-check, in the user's words. `nil` when everything works.
+    var selfCheckWarning: String? {
+        ChimeCatalogue.selfCheckWarning(missing: missing)
     }
 
     deinit {
@@ -41,8 +55,7 @@ final class ChimePlayer {
     /// Created once, at launch. Creating one at lid-close time would add disk latency to the
     /// single event that has to be immediate.
     private func prepare(_ chime: Chime, file: String) {
-        let url = URL(fileURLWithPath: "/System/Library/Sounds/\(file).aiff")
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let url = URL(fileURLWithPath: ChimeCatalogue.path(for: file))
         var identifier: SystemSoundID = 0
         guard AudioServicesCreateSystemSoundID(url as CFURL, &identifier) == kAudioServicesNoError
         else { return }
@@ -71,6 +84,14 @@ final class ChimePlayer {
         } else {
             AudioServicesPlayAlertSoundWithCompletion(identifier, nil)
         }
+    }
+
+    /// Plays a chime because the user pressed Play, ignoring their sound preference: the point
+    /// of the button is to answer "does this actually work on my Mac", and honouring a disabled
+    /// checkbox would answer it with silence that means something else entirely.
+    func preview(_ chime: Chime) {
+        guard let identifier = identifiers[chime] else { return }
+        AudioServicesPlayAlertSoundWithCompletion(identifier, nil)
     }
 
     /// A bonus, never a confirmation. `defaultPerformer` is nil on Macs with no Force Touch

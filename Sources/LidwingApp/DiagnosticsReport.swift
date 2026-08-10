@@ -14,7 +14,8 @@ enum DiagnosticsReport {
     static func build(system: LiveSystem,
                       machine: StateMachine,
                       audit: FileAuditSink,
-                      watchdogConnected: Bool) -> String {
+                      watchdogConnected: Bool,
+                      soundWarning: String? = nil) -> String {
         var lines: [String] = []
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
@@ -40,6 +41,10 @@ enum DiagnosticsReport {
         lines.append("  We set the clamshell bit   \(machine.weSetTheBit ? "yes" : "no")")
         lines.append("  Our idle assertion live    \(system.ourAssertionLive ? "yes" : "no")")
         lines.append("  Watchdog                   \(watchdogConnected ? "connected" : "not connected")")
+        // The sound self-check. Present in every report, including when it is fine: a support
+        // bundle is read by someone who cannot see the machine, and "sound: ok" is the line that
+        // rules a whole theory out in one second.
+        lines.append("  Sound                      \(soundWarning ?? "ok")")
         if let session = machine.session {
             lines.append("  Armed at                   \(iso(session.armedAt))")
             lines.append("  Re-asserts                 \(session.reasserts)")
