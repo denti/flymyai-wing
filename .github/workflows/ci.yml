@@ -82,6 +82,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - name: LidwingCore imports nothing platform-specific
         run: ./Scripts/check-core-purity.sh
+      # The build script and the runtime name the same files in different places. A rename on
+      # one side ships an app with no watchdog, which launches and looks entirely normal.
+      - name: The bundle contains what the app looks for
+        run: ./Scripts/check-bundle-contract.sh
 
   test-macos:
     runs-on: macos-15
