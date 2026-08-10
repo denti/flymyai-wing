@@ -145,15 +145,46 @@ public enum PowerAssertions {
     }
 }
 
-/// Which of those holds the user is actually told about, and what they are called.
+/// Which holds are worth saying anything about, and how loudly.
+///
+/// **The question is not "who is preventing sleep". It is "who will interfere with me."** Those
+/// are different questions and the first one produces nonsense: on a Mac with the display on,
+/// `powerd` always holds `Prevent sleep while display is on`, so asking the first question makes
+/// every Mac report a conflict on every launch - and names the operating system as an app while
+/// doing it. That shipped, and it was the first thing a user saw.
+///
+/// Lidwing blocks the clamshell **demand** sleep. Idle-sleep assertions are a different layer
+/// entirely, and we coexist with them perfectly. Three tiers, and only one of them is a conflict:
+///
+/// 1. **A genuine conflict** — the clamshell bit is already set and we do not own it. That is the
+///    only true conflict, it is worth interrupting a user over, and it does not come from
+///    assertions at all: it comes from ground truth, and it is handled by the repair path in
+///    decision 0011. It is rare.
+/// 2. **Worth a quiet line** — a `DenySystemSleep`-class holder such as Internet Sharing. The
+///    Mac will not sleep at all while that is held, so Lidwing's promise is temporarily moot.
+///    Worth stating, not worth warning about.
+/// 3. **Ignored entirely** — every `PreventUserIdleSystemSleep`, `NoIdleSleepAssertion` and
+///    `UserIsActive` holder, system or third-party, including `caffeinate` and the Claude
+///    desktop app. We coexist with all of them. They are diagnostics at most, never launch-path
+///    UI.
+///
+/// The owner's Mac holds seven assertions from six owners and **not one of them is a conflict**.
+/// That is the ordinary case, and the fixture asserts the app says nothing alarming about it.
 public enum ConflictPolicy {
 
-    /// A hold worth naming in the menu.
+    /// How much attention a hold deserves.
+    public enum Tier: Equatable, Sendable {
+        /// Say nothing. We coexist.
+        case ignore
+        /// One quiet, factual line. Not a warning.
+        case quietNote
+    }
+
+    /// A hold worth a line in the menu.
     public struct Conflict: Equatable, Sendable {
         public let displayName: String
         public let kind: PowerAssertions.Kind
         public let pid: Int32
-        /// True when the holder declared a release time. Reported, but never used to hide it.
         public let isTransient: Bool
 
         public init(displayName: String, kind: PowerAssertions.Kind, pid: Int32,
@@ -165,41 +196,31 @@ public enum ConflictPolicy {
         }
     }
 
-    /// Anything at or under this is somebody else's short-lived hold rather than a state of the
-    /// machine. `caffeinate -i -t 300` is the case that forced the number: Claude Code spawns
-    /// one **per command**, so a detector without this flaps every few minutes, forever - and a
-    /// menu bar that changes on its own teaches the user to stop reading it.
+    /// Kept for diagnostics only: a hold that releases itself is not a state of the machine.
     public static let transientThresholdSeconds = 600
 
-    /// Turns a human-recognisable name out of a process and an assertion name.
+    /// Only a hold that stops the machine sleeping outright is worth mentioning.
     ///
-    /// The assertion name is often the human one: an Internet Sharing hold belongs to `configd`,
-    /// which tells the user nothing, and is named `InternetSharingPreferencePlugin`, which tells
-    /// them exactly what to switch off.
+    /// Note what is *not* consulted here: whether the owner is an Apple daemon. `configd` is one,
+    /// and Internet Sharing is exactly the case tier 2 exists for. The old code filtered by
+    /// owner, which is why it both named `powerd` to users and would have hidden Internet
+    /// Sharing. The kind of hold is the honest signal; the owner is not.
+    public static func tier(for assertion: PowerAssertions.Assertion) -> Tier {
+        assertion.kind == .systemSleep ? .quietNote : .ignore
+    }
+
+    /// Turns a human-recognisable name out of a process and an assertion name.
     public static func displayName(process: String, assertionName: String) -> String {
         if assertionName.contains("InternetSharing") { return "Internet Sharing" }
-        if process == "caffeinate" { return "caffeinate" }
         if assertionName.hasPrefix("com.apple.") { return process }
-        // An Electron app names its assertion "Electron", which describes the toolkit rather
-        // than the app the user installed.
         if assertionName == "Electron" { return process }
         return process
     }
 
-    /// The holds worth showing, strongest first.
-    ///
-    /// Filtering, in order of what it protects the user from:
-    ///
-    /// * **System processes are dropped.** `powerd` and `WindowServer` assert constantly and a
-    ///   user can do nothing about either.
-    /// * **Display and user-active holds are dropped.** A closed lid has no display to keep
-    ///   awake, and a trackpad tickle is not a conflict.
-    /// * **Short-lived holds that release themselves are kept but marked transient**, so the UI
-    ///   can name them without treating them as a standing state of the machine.
-    public static func conflicts(from assertions: [PowerAssertions.Assertion]) -> [Conflict] {
+    /// The holds worth a line, strongest first. Usually empty, and that is correct.
+    public static func noteworthy(from assertions: [PowerAssertions.Assertion]) -> [Conflict] {
         assertions
-            .filter { !PowerAssertions.systemOwned.contains($0.process) }
-            .filter { $0.kind == .idleSleep || $0.kind == .systemSleep }
+            .filter { tier(for: $0) == .quietNote }
             .map { assertion in
                 Conflict(displayName: displayName(process: assertion.process,
                                                   assertionName: assertion.name),
@@ -208,24 +229,28 @@ public enum ConflictPolicy {
                          isTransient: (assertion.releasesInSeconds ?? .max)
                              <= transientThresholdSeconds)
             }
-            // A system-sleep hold outranks an idle one: it is the only kind that does what
-            // Lidwing does. Among equals, a standing hold outranks a self-releasing one.
             .sorted { left, right in
-                if (left.kind == .systemSleep) != (right.kind == .systemSleep) {
-                    return left.kind == .systemSleep
-                }
                 if left.isTransient != right.isTransient { return !left.isTransient }
                 return left.pid < right.pid
             }
     }
 
-    /// The one the menu names, or nil when nothing is worth saying.
-    ///
-    /// A purely transient holder is deliberately **not** promoted to the headline. If the only
-    /// thing holding this Mac is a `caffeinate` that releases in four minutes and will be
-    /// replaced by another one a moment later, saying so in the menu bar produces a flicker the
-    /// user cannot act on. It stays in the list, and in diagnostics, where it explains things
-    /// without shouting.
+    /// Everything else, for the diagnostics report and an Option-click, where being complete is
+    /// the point and interrupting nobody is guaranteed.
+    public static func coexisting(from assertions: [PowerAssertions.Assertion]) -> [Conflict] {
+        assertions
+            .filter { tier(for: $0) == .ignore }
+            .filter { $0.kind == .idleSleep }
+            .map { assertion in
+                Conflict(displayName: displayName(process: assertion.process,
+                                                  assertionName: assertion.name),
+                         kind: assertion.kind, pid: assertion.pid,
+                         isTransient: (assertion.releasesInSeconds ?? .max)
+                             <= transientThresholdSeconds)
+            }
+    }
+
+    /// The one the menu names, or nil - which is the ordinary answer on an ordinary Mac.
     public static func headline(from conflicts: [Conflict]) -> Conflict? {
         conflicts.first { !$0.isTransient }
     }

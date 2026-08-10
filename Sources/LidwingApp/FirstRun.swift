@@ -9,86 +9,12 @@ import LidwingCore
 /// glyph owes its user an arrow at it.
 enum FirstRun {
 
-    private static let calloutShownKey = "LidwingDidShowLocationCallout"
     private static let explainerShownKey = "LidwingDidShowExplainer"
 
-    // MARK: the location callout
-
-    static var shouldShowLocationCallout: Bool {
-        !UserDefaults.standard.bool(forKey: calloutShownKey)
-    }
-
-    static func showLocationCallout(near button: NSStatusBarButton?) {
-        guard shouldShowLocationCallout else { return }
-        UserDefaults.standard.set(true, forKey: calloutShownKey)
-
-        let width: CGFloat = 280
-        let height: CGFloat = 108
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
-        window.level = .floating
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = true
-
-        let container = NSVisualEffectView(frame: window.contentLayoutRect)
-        container.material = .popover
-        container.blendingMode = .behindWindow
-        container.state = .active
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 10
-        // Reduce Transparency: an opaque background instead of a vibrant one.
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
-            container.material = .windowBackground
-        }
-
-        let headline = label(FirstRunCopy.LocationCallout.headline,
-                             font: .boldSystemFont(ofSize: NSFont.systemFontSize),
-                             colour: .labelColor)
-        let body = label(FirstRunCopy.LocationCallout.body,
-                         font: .systemFont(ofSize: NSFont.smallSystemFontSize),
-                         colour: .secondaryLabelColor)
-        let dismiss = NSButton(title: FirstRunCopy.LocationCallout.dismiss,
-                               target: nil, action: nil)
-        dismiss.bezelStyle = .rounded
-        dismiss.target = window
-        dismiss.action = #selector(NSWindow.close)
-
-        let stack = NSStackView(views: [headline, body, dismiss])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
-        stack.frame = container.bounds
-        stack.autoresizingMask = [.width, .height]
-        container.addSubview(stack)
-        window.contentView = container
-
-        // Position under the status item, on the screen the menu bar is actually on. Never
-        // `NSScreen.main`: the menu bar follows the active display, and on a two-display setup
-        // the callout would appear next to nothing.
-        if let button, let buttonWindow = button.window {
-            let onScreen = buttonWindow.convertToScreen(button.bounds)
-            let screen = buttonWindow.screen ?? NSScreen.screens.first
-            var origin = NSPoint(x: onScreen.midX - width / 2, y: onScreen.minY - height - 6)
-            if let visible = screen?.visibleFrame {
-                origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - width - 8)
-            }
-            window.setFrameOrigin(origin)
-        } else {
-            window.center()
-        }
-
-        // Without this it appears behind the user's editor, which is the single most common
-        // mistake an accessory app makes.
-        NSApp.activate(ignoringOtherApps: true)
-        window.orderFrontRegardless()
-
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + FirstRunCopy.LocationCallout.autoDismissSeconds) { [weak window] in
-                window?.close()
-            }
-    }
+    // The location callout - a borderless popover pointing at the menu bar on first launch -
+    // was deleted here. It said "look for the wing", which is true and changes nothing anybody
+    // does: they have just installed a menu-bar app and are already looking at the menu bar.
+    // The rule it failed: what does the user do differently because of this? Nothing.
 
     // MARK: the explainer
 

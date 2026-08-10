@@ -161,16 +161,11 @@ extension StateMachine {
             effects.append(.recordVerifiedOS(identity.osVersion))
             lastVerifiedOS = identity.osVersion
         }
-        if let recheck = pendingOSRecheck {
-            pendingOSRecheck = nil
-            effects.append(.notify(.recheckedAfterOSUpdate(from: recheck.from, to: recheck.to)))
-        }
+        // The OS change is recorded and logged; it is not announced. Nothing about "macOS
+        // changed and this still works" alters what anybody does next.
+        pendingOSRecheck = nil
 
-        // No chime here. The user is looking at the menu they just clicked.
-        if !hasEverArmed {
-            hasEverArmed = true
-            effects.append(.notify(.firstArm))
-        }
+        // No chime here either. The user is looking at the menu they just clicked.
         return effects
     }
 

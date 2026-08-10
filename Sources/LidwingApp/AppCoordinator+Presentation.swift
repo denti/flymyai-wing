@@ -42,10 +42,6 @@ extension AppCoordinator {
 
     static func copy(for notice: UserNotice) -> (String, String)? {
         switch notice {
-        case .firstArm:
-            return (Strings.text("notify.firstArm.title", "Lidwing is running"),
-                    Strings.text("notify.firstArm.body",
-                                 "Look for the wing in your menu bar. You can close the lid now."))
         case .autoDisarmed(let reason):
             guard let sentence = reason.userFacingSentence else { return nil }
             return (Strings.text("notify.stopped.title", "Lidwing stopped"), sentence)
@@ -91,14 +87,6 @@ extension AppCoordinator {
                                  "Don't put your Mac in a bag while Lidwing is on"),
                     Strings.text("notify.bag.body",
                                  "With the lid closed and no airflow it can get very hot."))
-        case .recheckedAfterOSUpdate(_, let to):
-            // Said once, after the first arm that verifies on a new build. The reassurance is
-            // only worth an interruption because the alternative - this product silently not
-            // working after a macOS update - is the failure it is most likely to have.
-            return (Strings.text("notify.osRechecked.title",
-                                 "macOS changed, and Lidwing still works"),
-                    Strings.text("notify.osRechecked.body",
-                                 "Checked against %1$@ just now, not assumed.", to))
         }
     }
 

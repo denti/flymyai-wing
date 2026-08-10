@@ -44,11 +44,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: nil)
 
-        // Once, ever, and 400 ms after the item exists so it does not race the menu bar's own
-        // layout. Nothing else happens at launch.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            FirstRun.showLocationCallout(near: self?.statusItem.button)
-        }
+        // Nothing else happens at launch. There used to be a popover here pointing at the menu
+        // bar - "look for the wing" - and it went with the empty-notification rule: a user who
+        // has just installed a menu-bar app and watched it launch does nothing differently for
+        // having been told where its icon is. The glyph is the channel.
     }
 
     deinit {

@@ -70,118 +70,116 @@ final class PowerAssertionsTests: XCTestCase {
 }
 
 /// What the user is actually told, out of all that.
+///
+/// The governing question is **not** "who is preventing sleep" but "who will interfere with
+/// Lidwing". Asking the first one made every Mac report a conflict on every launch and called
+/// the operating system an app.
 final class ConflictPolicyTests: XCTestCase {
 
-    private func conflicts() throws -> [ConflictPolicy.Conflict] {
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "pmset-assertions-developer-mac",
-                                                  withExtension: "txt",
+    private func assertions(_ resource: String) throws -> [PowerAssertions.Assertion] {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: resource, withExtension: "txt",
                                                   subdirectory: "Fixtures"))
-        let text = try String(contentsOf: url, encoding: .utf8)
-        return ConflictPolicy.conflicts(from: PowerAssertions.parse(text))
+        return PowerAssertions.parse(try String(contentsOf: url, encoding: .utf8))
     }
 
-    /// macOS asserts constantly on its own behalf and the user can do nothing about any of it.
-    func testTheSystemsOwnNoiseIsNeverShown() throws {
-        let names = try conflicts().map(\.displayName)
-        for noise in ["powerd", "WindowServer", "mds_stores"] {
-            XCTAssertFalse(names.contains(noise), "\(noise) was shown to a user")
+    private func quietMac() throws -> [PowerAssertions.Assertion] {
+        try assertions("pmset-assertions-quiet-mac")
+    }
+
+    private func developerMac() throws -> [PowerAssertions.Assertion] {
+        try assertions("pmset-assertions-developer-mac")
+    }
+
+    // MARK: the ordinary Mac
+
+    /// Seven assertions, six owners, and **not one of them is a conflict**. This is what a normal
+    /// machine looks like, and the app must say nothing about any of it.
+    func testAnOrdinaryMacProducesNothingToSay() throws {
+        let held = try quietMac()
+        XCTAssertEqual(held.count, 7, "the fixture is not the machine it claims to be")
+        XCTAssertTrue(ConflictPolicy.noteworthy(from: held).isEmpty,
+                      "an ordinary Mac was told something was wrong: "
+                      + "\(ConflictPolicy.noteworthy(from: held).map(\.displayName))")
+        XCTAssertNil(ConflictPolicy.headline(from: ConflictPolicy.noteworthy(from: held)))
+    }
+
+    /// The exact false positive a user saw on first launch: "Another app is already keeping this
+    /// Mac awake: powerd (pid 368)." `powerd` holds that assertion whenever the display is on,
+    /// which is to say always, on every Mac.
+    func testPowerdIsNeverNamed() throws {
+        let names = try ConflictPolicy.noteworthy(from: quietMac()).map(\.displayName)
+            + ConflictPolicy.coexisting(from: quietMac()).map(\.displayName)
+        XCTAssertFalse(names.contains("powerd"),
+                       "named Apple's own power daemon to a user, on every Mac, on every launch")
+    }
+
+    /// The same class: Apple daemons doing ordinary work. None of them is an app, and none of
+    /// them interferes with a clamshell demand sleep.
+    func testNoAppleDaemonIsEverPresentedAsAConflict() throws {
+        let noteworthy = try ConflictPolicy.noteworthy(from: quietMac()).map(\.displayName)
+        for daemon in ["powerd", "WindowServer", "useractivityd", "sharingd", "mds_stores"] {
+            XCTAssertFalse(noteworthy.contains(daemon), "\(daemon) was presented as a conflict")
         }
     }
 
-    /// The case above cannot actually fail on its own: on the real fixture every system process
-    /// happens to hold a display or user-active assertion, so the *kind* filter drops them even
-    /// with the owner filter deleted. Each filter was masking the other, and a mutation removing
-    /// either one left the suite green.
-    ///
-    /// This isolates the owner filter with the combination the fixture does not contain: a
-    /// system process holding the strongest kind of hold there is.
-    func testASystemProcessIsDroppedEvenWhenItsHoldIsTheStrongKind() {
-        let systemHold = [PowerAssertions.Assertion(pid: 0, process: "powerd", kind: .systemSleep,
-                                                    name: "com.apple.powermanagement.something")]
-        XCTAssertTrue(ConflictPolicy.conflicts(from: systemHold).isEmpty,
-                      "a hold the user can do nothing about was named to them")
-    }
-
-    /// And this isolates the kind filter: an ordinary app, which the owner filter keeps, holding
-    /// a display assertion, which is meaningless once the lid is shut.
-    func testAnOrdinaryAppsDisplayHoldIsStillNotAConflict() {
-        let displayHold = [
-            PowerAssertions.Assertion(pid: 700, process: "Safari", kind: .display,
-                                      name: "Video playback"),
-            PowerAssertions.Assertion(pid: 233, process: "SomeApp", kind: .userActive,
-                                      name: "tickle")
-        ]
-        XCTAssertTrue(ConflictPolicy.conflicts(from: displayHold).isEmpty,
-                      "a display hold was reported as competing for a closed lid")
-    }
-
-    /// A closed lid has no display to keep awake, and a trackpad tickle is not a conflict.
-    func testDisplayAndUserActiveHoldsAreNotConflicts() throws {
-        for conflict in try conflicts() {
-            XCTAssertTrue(conflict.kind == .idleSleep || conflict.kind == .systemSleep,
-                          "\(conflict.displayName) is a \(conflict.kind) hold")
+    /// We coexist with every idle-sleep holder, Apple's or anybody's. Lidwing blocks the
+    /// clamshell demand sleep; these are a different layer.
+    func testIdleSleepHoldersAreIgnoredWhoeverOwnsThem() throws {
+        for held in try quietMac() where held.kind == .idleSleep {
+            XCTAssertEqual(ConflictPolicy.tier(for: held), .ignore,
+                           "\(held.process) holding an idle assertion was treated as a conflict")
         }
     }
 
-    func testTheThreeRealHoldersSurvive() throws {
-        XCTAssertEqual(Set(try conflicts().map(\.displayName)),
-                       ["Claude", "caffeinate", "Internet Sharing"])
+    /// Including the two most common third-party ones on a developer machine.
+    func testCaffeinateAndTheClaudeAppAreIgnored() throws {
+        let noteworthy = try ConflictPolicy.noteworthy(from: developerMac()).map(\.displayName)
+        XCTAssertFalse(noteworthy.contains("caffeinate"))
+        XCTAssertFalse(noteworthy.contains("Claude"))
     }
 
-    /// `configd` tells a user nothing. `InternetSharingPreferencePlugin` tells them what to
-    /// switch off, and "Internet Sharing" is what that is called in System Settings.
+    // MARK: the one that is worth a line
+
+    /// Internet Sharing holds `DenySystemSleep`: the Mac will not sleep at all while it is held,
+    /// so Lidwing's promise is temporarily moot. Worth stating; not worth warning about.
+    func testASystemSleepHolderIsWorthOneQuietLine() throws {
+        let noteworthy = try ConflictPolicy.noteworthy(from: developerMac())
+        XCTAssertEqual(noteworthy.map(\.displayName), ["Internet Sharing"])
+        XCTAssertEqual(noteworthy.first?.kind, .systemSleep)
+    }
+
+    /// `configd` is an Apple daemon and this case is still reported - the *kind* of hold is the
+    /// honest signal, not who owns it. Filtering by owner would both name `powerd` to users and
+    /// hide Internet Sharing, which is precisely the pair of mistakes the old code made.
+    func testOwnershipIsNotWhatDecidesIt() {
+        let internetSharing = PowerAssertions.Assertion(
+            pid: 366, process: "configd", kind: .systemSleep,
+            name: "InternetSharingPreferencePlugin")
+        XCTAssertEqual(ConflictPolicy.tier(for: internetSharing), .quietNote)
+        XCTAssertEqual(ConflictPolicy.noteworthy(from: [internetSharing]).first?.displayName,
+                       "Internet Sharing")
+    }
+
     func testAnOwnerIsNamedTheWayAPersonWouldRecogniseIt() {
         XCTAssertEqual(ConflictPolicy.displayName(process: "configd",
                                                   assertionName: "InternetSharingPreferencePlugin"),
                        "Internet Sharing")
-        // An Electron app names its assertion after the toolkit, not after itself.
         XCTAssertEqual(ConflictPolicy.displayName(process: "Claude", assertionName: "Electron"),
                        "Claude")
-        XCTAssertEqual(ConflictPolicy.displayName(process: "caffeinate",
-                                                  assertionName: "caffeinate command-line tool"),
-                       "caffeinate")
     }
 
-    /// The strongest hold leads: a system-sleep hold is the only kind that does what Lidwing
-    /// does, so Internet Sharing outranks two idle-sleep holders.
-    func testTheStrongestHoldIsRankedFirst() throws {
-        XCTAssertEqual(try conflicts().first?.displayName, "Internet Sharing")
-        XCTAssertEqual(try conflicts().first?.kind, .systemSleep)
-    }
+    // MARK: diagnostics
 
-    /// The flap test, and the reason the threshold exists. Claude Code spawns
-    /// `caffeinate -i -t 300` per command, so a detector that promotes it to the headline
-    /// changes the menu bar every few minutes forever - which teaches the user to ignore it.
-    func testASelfRespawningCaffeinateIsNeverTheHeadline() {
-        let caffeinateOnly = [PowerAssertions.Assertion(
-            pid: 47116, process: "caffeinate", kind: .idleSleep,
-            name: "caffeinate command-line tool", releasesInSeconds: 262)]
-        let conflicts = ConflictPolicy.conflicts(from: caffeinateOnly)
-
-        XCTAssertEqual(conflicts.count, 1, "it is still detected and still listed")
-        XCTAssertTrue(conflicts[0].isTransient)
-        XCTAssertNil(ConflictPolicy.headline(from: conflicts),
-                     "a hold that releases itself in four minutes became a menu-bar state")
-    }
-
-    /// ...but a real, standing holder is named immediately.
-    func testAStandingHolderIsTheHeadline() throws {
-        let headline = try XCTUnwrap(ConflictPolicy.headline(from: try conflicts()))
-        XCTAssertEqual(headline.displayName, "Internet Sharing")
-        XCTAssertFalse(headline.isTransient)
-    }
-
-    /// A hold with a very long timeout is not transient in any useful sense: it will outlive the
-    /// agent run the user is trying to protect.
-    func testALongTimeoutIsNotTreatedAsTransient() {
-        let long = [PowerAssertions.Assertion(pid: 900, process: "somebody", kind: .systemSleep,
-                                              name: "long hold", releasesInSeconds: 4 * 3600)]
-        XCTAssertFalse(ConflictPolicy.conflicts(from: long)[0].isTransient)
-        XCTAssertNotNil(ConflictPolicy.headline(from: ConflictPolicy.conflicts(from: long)))
+    /// Everything we coexist with is still available where being complete is the point and
+    /// interrupting nobody is guaranteed.
+    func testCoexistingHoldersAreStillAvailableForDiagnostics() throws {
+        let coexisting = try ConflictPolicy.coexisting(from: developerMac()).map(\.displayName)
+        XCTAssertTrue(coexisting.contains("Claude"))
+        XCTAssertTrue(coexisting.contains("caffeinate"))
     }
 
     func testNothingHeldMeansNothingSaid() {
-        XCTAssertTrue(ConflictPolicy.conflicts(from: []).isEmpty)
+        XCTAssertTrue(ConflictPolicy.noteworthy(from: []).isEmpty)
         XCTAssertNil(ConflictPolicy.headline(from: []))
     }
 }

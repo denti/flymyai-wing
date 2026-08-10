@@ -72,16 +72,6 @@ private struct Recheck {
     }
 }
 
-private func notices(_ effects: [LidwingEffect]) -> [UserNotice] {
-    effects.compactMap { if case .notify(let notice) = $0 { return notice } else { return nil } }
-}
-
-private func mentionsAnUpdate(_ effects: [LidwingEffect]) -> Bool {
-    notices(effects).contains {
-        if case .recheckedAfterOSUpdate = $0 { return true } else { return false }
-    }
-}
-
 /// The same thing wired through the state machine, which is where it has to be right: the notice
 /// must be earned by an arm that actually verified, and must never fire on its own.
 final class OSRecheckIntegrationTests: XCTestCase {
@@ -89,14 +79,13 @@ final class OSRecheckIntegrationTests: XCTestCase {
     func testAVerifiedArmOnANewBuildSaysSoExactlyOnce() {
         let harness = Recheck(os: "26.0 (25A100)", lastVerified: "15.6 (24G84)")
 
-        let first = notices(harness.armAndVerify())
-        XCTAssertTrue(first.contains(.recheckedAfterOSUpdate(from: "15.6 (24G84)",
-                                                             to: "26.0 (25A100)")),
-                      "a verified arm after a macOS update said nothing: \(first)")
-
+        // The notice this used to assert is deleted. "macOS changed and Lidwing still works"
+        // is true, friendly, and changes nothing anybody does. What survives is the fact being
+        // recorded, which is what makes a later failure explainable.
+        XCTAssertTrue(harness.armAndVerify().contains(.recordVerifiedOS("26.0 (25A100)")))
         harness.disarm()
-        XCTAssertFalse(mentionsAnUpdate(harness.armAndVerify()),
-                       "the update notice fired a second time")
+        XCTAssertFalse(harness.armAndVerify().contains(.recordVerifiedOS("26.0 (25A100)")),
+                       "re-recorded a build it had already verified on")
     }
 
     func testTheOSIsRecordedOnlyByAnArmThatVerified() {
@@ -122,22 +111,16 @@ final class OSRecheckIntegrationTests: XCTestCase {
         XCTAssertEqual(harness.machine.lastVerifiedOS, "26.0 (25A100)")
     }
 
-    /// The quiet case. A user who has not updated macOS must never see any of this.
-    func testNothingIsSaidWhenTheOSDidNotChange() {
+    func testItDoesNotRerecordABuildItAlreadyHas() {
         let harness = Recheck(os: "15.6 (24G84)", lastVerified: "15.6 (24G84)")
-        let effects = harness.armAndVerify()
-        XCTAssertFalse(mentionsAnUpdate(effects))
-        XCTAssertFalse(effects.contains(.recordVerifiedOS("15.6 (24G84)")),
+        XCTAssertFalse(harness.armAndVerify().contains(.recordVerifiedOS("15.6 (24G84)")),
                        "re-recorded an OS that was already stored")
     }
 
-    /// A first run has no baseline, and telling a new user that macOS changed - before Lidwing
-    /// has ever worked for them once - is noise about something they cannot act on.
-    func testAFirstRunIsQuietAndStillRecordsItsBaseline() {
+    /// A first run records the build it verified on, so a later change can be noticed at all.
+    func testAFirstRunRecordsItsBaseline() {
         let harness = Recheck(os: "15.6 (24G84)", lastVerified: nil)
-        let effects = harness.armAndVerify()
-        XCTAssertFalse(mentionsAnUpdate(effects), "a first run announced a macOS change")
-        XCTAssertTrue(effects.contains(.recordVerifiedOS("15.6 (24G84)")),
+        XCTAssertTrue(harness.armAndVerify().contains(.recordVerifiedOS("15.6 (24G84)")),
                       "a first run must still record the build it verified on")
     }
 

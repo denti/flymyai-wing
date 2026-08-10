@@ -86,11 +86,6 @@ public enum StringKey {
         StringEntry("tip.slept", "Click for details - this Mac slept while protected",
          "Tooltip after the machine slept despite protection. The one failure that matters."),
 
-        StringEntry("notify.osRechecked.title", "macOS changed, and Lidwing still works",
-         "Notification after the first successful arm following a macOS update."),
-        StringEntry("notify.osRechecked.body", "Checked against %1$@ just now, not assumed.",
-         "%1$@ is a macOS version string such as \"Version 15.6 (Build 24G84)\"."),
-
         StringEntry("settings.sound.play", "Play the Lid-Close Sound",
          "Button that plays the confirmation sound so the user can verify it works. Title case."),
         StringEntry("settings.sound.play.detail",
@@ -160,14 +155,10 @@ public enum StringKey {
         StringEntry("menu.failed.noTime", "Lidwing could not protect this Mac",
          "Failure header when the exact time of the sleep is not known."),
         StringEntry("menu.failed.detail", "See Diagnostics. Protection is not active.", ""),
-        StringEntry("menu.foreign", "Another app is keeping this Mac awake",
-         "Something else holds a sleep assertion. Shown when Lidwing itself is off."),
-        StringEntry("menu.foreign.transient", "%1$@ is also holding it awake, briefly.",
-         "%1$@ is a process that declared it will release its hold shortly, such as caffeinate."),
-        StringEntry("menu.foreign.strong", "%1$@ is holding this Mac awake on its own.",
-         "%1$@ holds a system-sleep assertion, which stops sleep without Lidwing's help."),
-        StringEntry("menu.foreign.detail", "%1$@ is also holding this Mac awake.",
-         "%1$@ is the other app's name. Information, not an excuse: Lidwing still works."),
+        StringEntry("menu.foreign.detail",
+         "%1$@ is holding this Mac awake, so it will not sleep for now.",
+         "%1$@ is something holding a system-sleep assertion, such as Internet Sharing. A quiet "
+         + "statement of fact, never a warning: it must not read as a problem the user caused."),
         StringEntry("menu.nolid", "This Mac has no lid",
          "Shown on a desktop Mac. The feature is hidden here, not merely disabled."),
         StringEntry("menu.nolid.detail", "There is no lid-close sleep to prevent here.", ""),
@@ -211,9 +202,6 @@ public enum StringKey {
         StringEntry("refuse.notInApplications", "Move Lidwing to your Applications folder first.", ""),
 
         // Notifications.
-        StringEntry("notify.firstArm.title", "Lidwing is running", ""),
-        StringEntry("notify.firstArm.body",
-         "Look for the wing in your menu bar. You can close the lid now.", ""),
         StringEntry("notify.stopped.title", "Lidwing stopped", ""),
         StringEntry("notify.armFailed.title", "Lidwing could not keep this Mac awake", ""),
         StringEntry("notify.armFailed.body",

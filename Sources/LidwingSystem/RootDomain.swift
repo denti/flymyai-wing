@@ -222,16 +222,19 @@ public enum AssertionInspector {
             guard holderPID != pid else { continue }
             for entry in entries {
                 guard let type = entry[kIOPMAssertionTypeKey as String] as? String else { continue }
-                // Classified rather than filtered to a single bucket. The distinction matters:
-                // an idle-sleep hold cannot stop a lid close, so its holder is worth naming but
-                // must never stop Lidwing arming. Display and user-active holds are held by half
-                // the machine and are nobody's business.
+                // Only a hold that stops the machine sleeping outright reaches the UI.
+                //
+                // This used to accept idle-sleep holds too, and the result was the first thing a
+                // user ever saw from this app: "Another app is already keeping this Mac awake:
+                // powerd (pid 368)." On every Mac, on every launch, naming the operating system
+                // as an app. Lidwing blocks the clamshell *demand* sleep; idle assertions are a
+                // different layer and we coexist with them. See decision 0014.
                 let kind = PowerAssertions.kind(ofAssertionNamed: type)
-                guard kind == .idleSleep || kind == .systemSleep else { continue }
-
                 let process = (entry["Process Name"] as? String) ?? "pid \(holderPID)"
-                guard !PowerAssertions.systemOwned.contains(process) else { continue }
                 let assertionName = (entry[kIOPMAssertionNameKey as String] as? String) ?? ""
+                let candidate = PowerAssertions.Assertion(pid: holderPID, process: process,
+                                                          kind: kind, name: assertionName)
+                guard ConflictPolicy.tier(for: candidate) == .quietNote else { continue }
 
                 // `Timeout` is seconds remaining when the owner set one. `caffeinate -t 300`
                 // does; a persistent holder does not.

@@ -22,19 +22,6 @@ enum StatusIcon {
         case degraded      // solid wing + warning dot
         case failed        // solid wing + cross
         case unsupported   // outline wing, dimmed by appearsDisabled
-        /// Another app is holding this Mac awake, so Lidwing stood down. Outline wing plus the
-        /// same attention dot the degraded state uses.
-        ///
-        /// The grammar across the whole set is two independent cues: **fill** means Lidwing is
-        /// protecting, and a **dot** means something wants attention. Solid plus dot is "still
-        /// protecting, but a guard is warning"; outline plus dot is "not protecting, and here is
-        /// why". Neither uses colour, because template images cannot carry any.
-        ///
-        /// Decision 0012 makes this a headline state rather than a diagnostic: on a Mac with
-        /// `caffeinate` running - which is the owner's Mac right now - it is the state the user
-        /// will actually see, and an app that looked simply "off" there would be hiding the one
-        /// fact that explains the machine's behaviour.
-        case foreign
     }
 
     /// Rendered images, keyed by shape and thickness.
@@ -90,10 +77,6 @@ enum StatusIcon {
             wing.fill()
         case .degraded:
             wing.fill()
-            badgeDot(in: side, filled: true).fill()
-        case .foreign:
-            wing.lineWidth = max(1.0, side / 22.0)
-            wing.stroke()
             badgeDot(in: side, filled: true).fill()
         case .failed:
             wing.fill()
@@ -152,12 +135,15 @@ enum StatusIcon {
         return path
     }
 
-    /// Takes the whole snapshot rather than the state alone, because "another app is in control"
-    /// is not a state of ours - we are idle, and idle is exactly what it would otherwise look
-    /// like.
+    /// Takes the whole snapshot for symmetry with the menu, though only the state decides.
+    ///
+    /// There was briefly a distinct glyph for "another app is in control", with an attention dot.
+    /// It went with decision 0014: the only genuine conflict is the clamshell bit being set by
+    /// somebody else, and that is the repair state, which has a glyph already. A
+    /// `DenySystemSleep` holder is worth one quiet line and no badge at all - a dot in the menu
+    /// bar is a warning, and warning a user about Internet Sharing being on is noise.
     static func shape(for snapshot: MenuPresenter.Snapshot) -> Shape {
-        if snapshot.state == .idle && snapshot.foreignHolder != nil { return .foreign }
-        return shape(for: snapshot.state)
+        shape(for: snapshot.state)
     }
 
     static func shape(for state: LidwingState) -> Shape {

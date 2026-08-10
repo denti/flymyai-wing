@@ -64,8 +64,11 @@ final class MenuPresenterTests: XCTestCase {
     func testForeignHolderIsNamedRatherThanFoughtOver() {
         let content = MenuPresenter.content(
             for: snapshot(state: .idle, holder: ForeignHolder(pid: 812, name: "Amphetamine")))
-        XCTAssertEqual(content.headline, "Another app is keeping this Mac awake")
-        XCTAssertEqual(content.detail, "Amphetamine is also holding this Mac awake.")
+        // Stated in the detail line, under the ordinary off headline. Decision 0014: a quiet
+        // fact, never a warning, and never the headline.
+        XCTAssertEqual(content.headline, "Off - your Mac sleeps normally")
+        XCTAssertEqual(content.detail,
+                       "Amphetamine is holding this Mac awake, so it will not sleep for now.")
     }
 
     func testNoLidIsHiddenNotMerelyDisabled() {
@@ -259,22 +262,18 @@ final class ConflictLineTests: XCTestCase {
                        "claimed Lidwing gave up while it was protecting")
     }
 
-    /// `caffeinate -t 300` is respawned per command. Sending the user to hunt for something that
-    /// stops existing while they look is worse than saying nothing.
-    func testASelfReleasingHolderSaysSo() {
-        let detail = armed(with: ForeignHolder(pid: 47116, name: "caffeinate",
-                                               kind: .idleSleep, isTransient: true)).detail
-        XCTAssertEqual(detail?.contains("caffeinate"), true)
-        XCTAssertEqual(detail?.contains("briefly"), true, detail ?? "nil")
-    }
-
-    /// A system-sleep hold really is doing the job on its own, and says so differently.
-    func testAStrongHolderIsDescribedDifferently() {
-        let strong = armed(with: ForeignHolder(pid: 366, name: "Internet Sharing",
+    /// Only a system-sleep holder reaches this line at all now, so there is one wording rather
+    /// than three. The transient and idle variants went with decision 0014: `caffeinate` and an
+    /// Electron app are things Lidwing coexists with, not things it reports.
+    func testTheLineIsAQuietStatementRatherThanAWarning() {
+        let detail = armed(with: ForeignHolder(pid: 366, name: "Internet Sharing",
                                                kind: .systemSleep)).detail
-        let idle = armed(with: ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep)).detail
-        XCTAssertNotEqual(strong, idle)
-        XCTAssertEqual(strong?.contains("on its own"), true, strong ?? "nil")
+        let text = try? XCTUnwrap(detail)
+        XCTAssertEqual(detail?.contains("Internet Sharing"), true)
+        for alarming in ["warning", "problem", "cannot", "failed", "stood down"] {
+            XCTAssertEqual(text?.lowercased().contains(alarming), false,
+                           "\(text ?? "") reads as a warning")
+        }
     }
 
     /// Conflict is a headline fact, not a fallback. A battery or thermal warning already owns

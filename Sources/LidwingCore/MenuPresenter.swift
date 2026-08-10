@@ -83,11 +83,13 @@ public struct MenuPresenter {
 
         case .idle:
             if let holder = snapshot.foreignHolder {
-                return Content(headline: Strings.text("menu.foreign",
-                                                      "Another app is keeping this Mac awake"),
+                // Off, and something else is holding the machine outright. Stated, not warned
+                // about: the headline stays the ordinary off headline, and the fact goes in the
+                // detail line underneath.
+                return Content(headline: Strings.text("menu.off", "Off - your Mac sleeps normally"),
                                detail: foreignDetail(holder),
                                toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: true,
-                               accessibilityValue: "Off, another app is keeping this Mac awake")
+                               accessibilityValue: "Off")
             }
             return Content(headline: Strings.text("menu.off", "Off - your Mac sleeps normally"),
                            detail: power(snapshot),
@@ -179,17 +181,19 @@ public struct MenuPresenter {
     /// command by Claude Code, and a user reading "caffeinate is keeping this Mac awake" with no
     /// further qualification would go looking for something to switch off that stops existing
     /// while they look for it.
+    /// The one quiet line, for the one case that earns it.
+    ///
+    /// Only a `DenySystemSleep`-class holder ever reaches here now: while it is held the Mac will
+    /// not sleep at all, so Lidwing's promise is temporarily moot and saying so is useful. Every
+    /// idle-sleep holder - `caffeinate`, an Electron app, half of Apple's daemons - is ignored
+    /// entirely, because Lidwing blocks the clamshell demand sleep and coexists with all of them.
+    ///
+    /// Deliberately not a warning. The first thing a new user saw from this app used to be
+    /// "Another app is already keeping this Mac awake: powerd (pid 368)", which was false, alarming
+    /// and about the operating system.
     static func foreignDetail(_ holder: ForeignHolder) -> String {
-        if holder.isTransient {
-            return Strings.text("menu.foreign.transient",
-                                "%1$@ is also holding it awake, briefly.", holder.name)
-        }
-        if holder.kind == .systemSleep {
-            return Strings.text("menu.foreign.strong",
-                                "%1$@ is holding this Mac awake on its own.", holder.name)
-        }
-        return Strings.text("menu.foreign.detail", "%1$@ is also holding this Mac awake.",
-                            holder.name)
+        Strings.text("menu.foreign.detail",
+                     "%1$@ is holding this Mac awake, so it will not sleep for now.", holder.name)
     }
 
     private static func power(_ snapshot: Snapshot) -> String? {

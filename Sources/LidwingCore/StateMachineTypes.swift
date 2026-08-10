@@ -97,8 +97,18 @@ public enum Chime: String, Equatable, Sendable {
     case agentWaiting
 }
 
+/// Every case here has to pass one test: **what does the user do differently because of it?**
+///
+/// If the honest answer is nothing, it does not exist - not softened, deleted. Two were deleted
+/// under that rule: a first-arm greeting, and a note that macOS had changed and Lidwing still
+/// worked. Both were true, both were friendly, and neither changed anything anybody would do.
+/// The product is the mechanism working, not commentary about the mechanism.
+///
+/// What remains either tells the user their Mac is about to sleep, or that it is not protected
+/// when they think it is, or asks them to do something physical about heat. The menu-bar glyph
+/// carries state silently and is the primary channel; text interrupts only when there is an act
+/// to take.
 public enum UserNotice: Equatable, Sendable {
-    case firstArm
     case autoDisarmed(DisarmReason)
     case armFailed(MechanismError?)
     case releaseFailed
@@ -109,9 +119,6 @@ public enum UserNotice: Equatable, Sendable {
     case groundTruthLost
     /// Shown at most once a week when arming on battery. We cannot detect a bag; we can warn.
     case bagWarning
-    /// macOS changed since the last arm that verified, and this arm verified anyway. Said once,
-    /// because "it still works" is only worth interrupting for when the user has reason to doubt.
-    case recheckedAfterOSUpdate(from: String, to: String)
 }
 
 /// Everything the state machine wants the host to do that is not a system read or write.
