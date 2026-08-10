@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 8** · 2026-08-10
+**Cycle 9** · 2026-08-10
 
 ## PROVEN
 
@@ -26,10 +26,12 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, twenty-three ways.** Deliberate mutations produced
-  21, 14, 9, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 and 1 failures. Numbers and mutations in
-  `TESTING.md`; the ones caught by a single test are called out as the weak spots rather than
-  averaged away.
+- **The suite has been proven able to fail, twenty-three ways**, and every gate in the
+  repository has now been watched failing at least once except one, which is named as unproven
+  in `TESTING.md` rather than listed beside the others. Deliberate mutations produced
+  21, 14, 9, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 and 1 failures. Numbers
+  and mutations are in `TESTING.md`; the ones caught by a single test are called out as the weak
+  spots rather than averaged away.
 - **1000 arm/disarm cycles** leave ground truth stock, zero leaked assertions, no ledger.
 - **12 000 random state transitions** never leave the machine reporting protection without
   owning the mechanism.
@@ -97,6 +99,8 @@ Nothing is idling on any of these.
 | State on disk | The directory is verified and repaired on every launch rather than trusted from its creation; a symlink in its place is refused; sockets are private from the instant `bind` creates them |
 | Documented numbers | Every test count this repository publishes about itself is checked against the repository. It was wrong when the check was written |
 | Workflow pipes | Every `run:` block that pipes is checked for `set -o pipefail`, parsed as block scalars rather than by proximity. Six steps were masking their exit codes, two of them the canary's |
+| Run completeness | Every script that summarises now knows how many assertions a complete run makes and refuses to report success when fewer ran. `invariants.sh` proves its own guard in CI on every build; the two Mac-only scripts have theirs extracted and tested, because they execute nowhere else |
+| The M0 verdict | The arithmetic that decides the architecture is extracted from the shipped script and run against sixteen cases, including the one that mattered: a run in which the lid was never closed |
 | macOS updates | The build on which an arm last verified is remembered; a change is noticed at launch and reported by the next verified arm. Nothing probes, because nothing may arm unasked |
 | Sound self-check | Fallbacks per chime, a Play button, and a check that names what is missing. Sound is the only channel once the lid is shut |
 | Launch at login | `SMAppService` only, never ticked by default, and the checkbox is read from the live system status rather than a boolean of ours - the one a user can revoke while the app is not running. No checkbox at all on macOS 12, where the only mechanisms are the two the antipattern list forbids |
