@@ -127,6 +127,11 @@ public final class WatchdogClient: WatchdogLink {
     public var launchWatchdog: (() -> Bool)?
 
     private var readSource: DispatchSourceRead?
+    /// Bootstrapping the agent runs `launchctl bootout` and `bootstrap`, which is not free and
+    /// is pointless to repeat in a tight loop. If it did not work a moment ago it will not work
+    /// now, and hammering launchd is a worse failure than telling the user we stood down.
+    private var lastLaunchAttempt: Date = .distantPast
+    private let launchCooldown: TimeInterval = 5
 
     public init(socketPath: String = SupportDirectory.file(LidwingID.controlSocketName).path,
                 bootSession: String,
@@ -147,6 +152,8 @@ public final class WatchdogClient: WatchdogLink {
             return true
         }
         // No listener. Ask the host to bootstrap the agent, then try again for a moment.
+        guard Date().timeIntervalSince(lastLaunchAttempt) >= launchCooldown else { return false }
+        lastLaunchAttempt = Date()
         guard launchWatchdog?() == true else { return false }
         for _ in 0..<40 {                       // up to 2 s, 50 ms apart
             usleep(50_000)

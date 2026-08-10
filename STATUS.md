@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 5** · 2026-08-10
+**Cycle 6** · 2026-08-10
 
 ## PROVEN
 
@@ -11,7 +11,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **165 unit tests, 0 failures**, 1.0 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **174 unit tests, 0 failures**, 1.0 s on Linux; the same suite plus 20 macOS-only tests in CI.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
   binary, 12 528 bytes, no warnings at `-Wall -Wextra -Werror`, and **4 ms with no listener**
   against a 150 ms budget. Running it found a real defect — see below.
@@ -93,12 +93,13 @@ Nothing is idling on any of these.
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 6 (code vs the specification) | Read the transitions with `DESIGN.md` open beside them | **On a Mac with no lid, nothing ever concluded that.** `lidState` correctly stays `.unknown` while the lid driver has not reported — but nothing turned that into a decision, so on a Mac mini the state stayed `.unknown` forever and the user could turn Lidwing on and read *"Awake — you can close the lid"*. |
 | 5 (running, not reading) | Compile and execute the hook helper | It read stdin non-blockingly, so a payload the caller wrote a moment later was **silently lost** and every Claude Code notification would have arrived with an empty body. The test that proves it needed the race made deterministic first. |
 | 1 | Read for correctness | **Critical.** `wingprobe disarm` — the safety valve — called `arm()` on its way through and would have armed the machine it was asked to release. |
 | 2 | Read as a running process | A modal dialog spins its own run loop, so the reconcile timer fired underneath one and could stack a second dialog on top. And a verify tick that returned early without stopping its own 10 Hz timer. |
 | 3 | Fresh eyes, trace every write | **High.** The Repair button could not clear a bit left behind by a previous process, and reported success. It survived two audits and 135 passing tests because `MockSystem` wrote unconditionally — a mock more permissive than the machine does not test, it reassures. |
 
-Fourteen rejected findings are recorded with their reasons.
+Eighteen rejected findings are recorded with their reasons.
 
 ## NEXT
 

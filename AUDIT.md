@@ -303,6 +303,13 @@ protecting.
 | "Conclude no-lid immediately when the key is absent at launch." | This is the mistake the specification warns about by name. The key is absent on a laptop until the lid driver reports, and a Lidwing that disables itself at every login is worse than one that waits ten seconds. |
 | "Probe by arming and seeing what happens." | Never. The runtime probe reads; it does not write. Arming to find out whether arming works is exactly the class of thing this product refuses to do to somebody's machine. |
 
-**Round 6 verdict:** one medium defect, found by reading the code against the specification
-rather than against itself. The specification described a state — *no lid* — that the code had
-a name for and no path to.
+### Two more from the same read
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 6.2 | **A failed recovery stood down in silence.** After a sleep while armed, the app tries to protect the machine again; when that fails too it went back to `idle` with no sound and no notification. The user had gone to sleep expecting an eight-hour run that was now over — the quietest possible way to lose somebody's night of work. | Medium | It chimes and names the reason. A test also pins that the audit record still carries the sleep: `reason=watchdog_lost` with `ground_truth_failures=1` and `isCleanSoak` false, so the record cannot describe the session as clean because the *last* thing that happened had a different name. |
+| 6.3 | `WatchdogClient.connect()` ran `launchctl bootout` and `bootstrap` on every failed attempt. Bounded in practice, but hammering launchd is a worse failure than standing down. | Low | A five-second cooldown. If it did not work a moment ago it will not work now. |
+
+**Round 6 verdict:** one medium defect from reading the code against the specification rather
+than against itself — the specification described a state, *no lid*, that the code had a name
+for and no path to — plus two more from walking the same file's error paths.
