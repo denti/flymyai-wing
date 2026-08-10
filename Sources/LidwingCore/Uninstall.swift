@@ -19,6 +19,10 @@ public struct UninstallPlan: Equatable, Sendable {
         case restoreDisplacedConfiguration
         /// Stop and deregister the watchdog agent.
         case removeWatchdog
+        /// Deregister the login item. Skipping this leaves macOS holding a registration for an
+        /// app that is about to be dragged to the Trash, which shows up in System Settings as a
+        /// login item the user cannot remove by deleting anything.
+        case removeLoginItem
         /// Delete the sockets, the ledger and the audit log.
         case removeSupportDirectory
         /// Read the machine one more time and refuse to claim success if it is not stock.
@@ -32,6 +36,7 @@ public struct UninstallPlan: Equatable, Sendable {
         .removeIntegrations,
         .restoreDisplacedConfiguration,
         .removeWatchdog,
+        .removeLoginItem,
         .removeSupportDirectory,
         .verifyStock,
         .revealApp
@@ -49,6 +54,9 @@ public struct UninstallPlan: Equatable, Sendable {
             return "Put back the tool we chained to, before our own preferences are deleted."
         case .removeWatchdog:
             return "The dead-man goes after the thing it was watching is already released."
+        case .removeLoginItem:
+            return "Deregister while the bundle still exists: SMAppService identifies the item "
+                + "by the app, and an app already in the Trash cannot deregister itself."
         case .removeSupportDirectory:
             return "Our own files last: the ledger is what a repair path would have needed."
         case .verifyStock:

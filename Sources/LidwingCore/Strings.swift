@@ -92,6 +92,26 @@ public enum StringKey {
          "%1$@ is a comma-separated list of internal chime names. Shown only when sounds are "
          + "genuinely absent."),
 
+        StringEntry("uninstall.step.login", "Stop it opening at login.",
+         "One line in the uninstall plan the user reads before confirming."),
+        StringEntry("settings.startup", "Startup",
+         "Section header above the login checkbox."),
+        StringEntry("settings.login", "Open Lidwing at login",
+         "Checkbox. Never ticked by default."),
+        StringEntry("settings.login.detail",
+         "Lidwing starts with your Mac. It still does nothing until you turn it on.",
+         "Explanation under the login checkbox. The second sentence matters: starting at login "
+         + "does not mean arming at login."),
+        StringEntry("login.unavailable", "Opening at login needs macOS 13 or later.",
+         "Shown instead of the checkbox on macOS 12, where no compliant mechanism exists."),
+        StringEntry("login.approval",
+         "Waiting for your approval in System Settings, under General \u{25B8} Login Items.",
+         "Shown when macOS has registered the login item but the user has not approved it."),
+        StringEntry("login.notFound", "macOS lost track of this. Switch it on again to fix it.",
+         "Shown when the registration exists but macOS cannot find the app, usually after a move."),
+        StringEntry("login.failed", "macOS would not change this: %1$@",
+         "%1$@ is a system error message. Shown when register or unregister throws."),
+
         // Menu — the entire visible surface of the product.
         StringEntry("menu.toggle", "Keep Awake with the Lid Closed",
          "The one command in the menu. Title case."),

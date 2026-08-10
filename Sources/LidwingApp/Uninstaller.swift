@@ -68,6 +68,20 @@ enum Uninstaller {
                 outcome.note(step, gone ? "agent deregistered and its plist removed"
                                         : "the agent plist is still on disk", ok: gone)
 
+            case .removeLoginItem:
+                // Report the outcome from the system's own status afterwards, never from the
+                // absence of a thrown error. `.notRegistered` on a Mac that never had one is a
+                // success, and saying so is more useful than staying silent about it.
+                let failure = LoginItemController.set(false)
+                let after = LoginItemController.status
+                switch after {
+                case .notRegistered, .unavailable:
+                    outcome.note(step, "not registered at login")
+                default:
+                    outcome.note(step, failure ?? "macOS still reports a login item",
+                                 ok: false)
+                }
+
             case .removeSupportDirectory:
                 try? FileManager.default.removeItem(at: SupportDirectory.url)
                 let gone = !FileManager.default.fileExists(atPath: SupportDirectory.url.path)
@@ -141,6 +155,9 @@ enum Uninstaller {
         case .removeWatchdog:
             return Strings.text("uninstall.step.watchdog",
                                 "Stop and remove its background helper.")
+        case .removeLoginItem:
+            return Strings.text("uninstall.step.login",
+                                "Stop it opening at login.")
         case .removeSupportDirectory:
             return Strings.text("uninstall.step.files", "Delete its own files.")
         case .verifyStock:

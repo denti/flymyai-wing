@@ -45,7 +45,19 @@ final class UninstallTests: XCTestCase {
 
     func testThePlanHasNoDuplicatesAndNoGaps() {
         XCTAssertEqual(Set(UninstallPlan.steps).count, UninstallPlan.steps.count)
-        XCTAssertEqual(UninstallPlan.steps.count, 7)
+        XCTAssertEqual(UninstallPlan.steps.count, 8)
+    }
+
+    /// The login item has to be deregistered while the bundle still exists: SMAppService
+    /// identifies the item by the app, and an app already in the Trash cannot deregister itself.
+    func testTheLoginItemIsRemovedBeforeTheUserIsSentToTheApp() {
+        let steps = UninstallPlan.steps
+        guard let login = steps.firstIndex(of: .removeLoginItem),
+              let reveal = steps.firstIndex(of: .revealApp) else {
+            return XCTFail("the plan lost a step it is supposed to have")
+        }
+        XCTAssertLessThan(login, reveal,
+                          "the user is shown the app to drag away before the login item is gone")
     }
 
     /// Tier 1 installs no privileged helper at all. A file at any of these paths would mean a

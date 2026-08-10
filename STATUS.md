@@ -11,7 +11,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **203 unit tests, 0 failures**, 1.3 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **211 unit tests, 0 failures**, 1.4 s on Linux; the same suite plus 20 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -22,8 +22,8 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, nineteen ways.** Deliberate mutations produced 21,
-  14, 9, 3, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 and 1 failures. Numbers and mutations in
+- **The suite has been proven able to fail, twenty-three ways.** Deliberate mutations produced
+  21, 14, 9, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 and 1 failures. Numbers and mutations in
   `TESTING.md`; the ones caught by a single test are called out as the weak spots rather than
   averaged away.
 - **1000 arm/disarm cycles** leave ground truth stock, zero leaked assertions, no ledger.
@@ -81,6 +81,7 @@ Nothing is idling on any of these.
 | Bundle contract | The build script, the signing script and the runtime name the same files in three places. A script checks they agree, with five positive controls |
 | macOS updates | The build on which an arm last verified is remembered; a change is noticed at launch and reported by the next verified arm. Nothing probes, because nothing may arm unasked |
 | Sound self-check | Fallbacks per chime, a Play button, and a check that names what is missing. Sound is the only channel once the lid is shut |
+| Launch at login | `SMAppService` only, never ticked by default, and the checkbox is read from the live system status rather than a boolean of ours - the one a user can revoke while the app is not running. No checkbox at all on macOS 12, where the only mechanisms are the two the antipattern list forbids |
 | Accessibility | Display accommodations read live, Reduce Motion honoured, one tooltip per state, focus starts on a control. The parts a machine cannot check are `docs/human-checklist.md` H8 |
 
 ## Decisions recorded
@@ -113,11 +114,12 @@ Twenty-three rejected findings are recorded with their reasons.
 
 ## NEXT
 
-1. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
+1. Sweep the remaining antipatterns the way round 8 swept §8 and the first forty. Reading the
+   specification beside the code was the most productive round so far, which is worth saying
+   plainly: six earlier rounds read this code for correctness, and none of them read it against
+   the document that defines what "done" means for the visible surface.
+2. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
    measurement, and `AUDIT.md` says so rather than quoting budgets as results.
-2. Launch at login. Wanted by every user of a menu-bar app, and it has real requirements rather
-   than being a checkbox: never on by default, never a cached boolean of our own, `SMAppService`
-   only (antipatterns 21-23).
 3. The real README with the four falsify-us commands and the compatibility table — last, per
    `DECISIONS.md`, and only listing combinations with a green acceptance run.
 4. Everything blocked on a Mac: M0, fault injection, the perf gate, the smoke script, and the

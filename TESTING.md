@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **203** |
+| Tests | **211** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -67,15 +67,19 @@ its own bookkeeping:
 | 17 | A chime with nothing available is dropped instead of reported | antipattern 37 exactly: the option remains, the sound does not | **2** |
 | 18 | The sound self-check reports success too, on every launch | noise that trains the user to ignore the one real warning | **1** |
 | 19 | The failure sound reuses a confirmation sound | a failure that sounds exactly like success | **2** |
+| 20 | A fresh install presents the login checkbox already ticked | antipattern 21: registering a login item without asking, with a fig leaf | **2** |
+| 21 | `requiresApproval` counts as launching at login | reads as on inside the app, launches nothing at login | **2** |
+| 22 | macOS 12 gets the login checkbox anyway | a control that cannot work, where no compliant mechanism exists | **2** |
+| 23 | The login item is deregistered after the user is sent to the app | `SMAppService` identifies the item by the app; one already in the Trash cannot deregister itself | **1** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist
 because the mock was corrected to model a guard the real machine has and the mock did not.
 
-**Mutations 4, 8, 9, 10, 13 and 15 are each caught by exactly one test.** They are listed
+**Mutations 4, 8, 9, 10, 13, 15 and 23 are each caught by exactly one test.** They are listed
 individually rather than averaged into a comfortable number, because a single test is a single
 careless edit away from being the only thing that noticed.
 
@@ -151,7 +155,7 @@ user's agent, and actually gets the data.
 |---|---|---|---|
 | Core purity | `./Scripts/check-core-purity.sh` | pass, 22 files scanned | Inserting `import AppKit` into `Sources/LidwingCore/Version.swift` produced `FAIL: LidwingCore imports a platform-specific framework` and exit 1; removing it returned exit 0. Transcript below. |
 | Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
-| Lint | `swiftlint lint --strict` | **0 violations in 132 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
+| Lint | `swiftlint lint --strict` | **0 violations in 138 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
 | Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
 | Bundle contract | `./Scripts/check-bundle-contract.sh` | pass | Five controls, each proven red: the watchdog renamed in the build, the helper dropped from signing, a bundle id drifting in a workflow, the constant made unextractable, the agent plist missing from the build. Two of the five failed first time because of defects **in the check** - see `AUDIT.md` round 8. |
 | Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |

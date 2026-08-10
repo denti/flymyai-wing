@@ -21,6 +21,13 @@ final class SettingsWindowController: NSWindowController {
                                                                   "Play a sound when the lid closes"),
                                          target: nil, action: nil)
 
+    private let loginCheckbox = NSButton(checkboxWithTitle: Strings.text("settings.login",
+                                                                  "Open Lidwing at login"),
+                                         target: nil, action: nil)
+    /// The sentence under the login checkbox. Its text changes with the live status, so it is
+    /// held rather than built once.
+    private let loginNote = NSTextField(labelWithString: "")
+
     private let modeControl = NSSegmentedControl(labels: [Strings.text("settings.mode.manual", "Manual"),
                                                           Strings.text("settings.mode.auto", "Auto")],
                                                  trackingMode: .selectOne,
@@ -123,6 +130,7 @@ final class SettingsWindowController: NSWindowController {
                          "A closed lid blocks airflow. Lidwing stops before your Mac overheats.")))
 
         for view in soundSection() { stack.addArrangedSubview(view) }
+        for view in loginSection() { stack.addArrangedSubview(view) }
 
         stack.addArrangedSubview(separator())
         for view in agentsSection() { stack.addArrangedSubview(view) }
@@ -227,6 +235,52 @@ final class SettingsWindowController: NSWindowController {
         return views
     }
 
+    /// Opening at login. Never ticked by default, and never from a preference of our own: the
+    /// checkbox is set from the live system status every time this window is shown.
+    private func loginSection() -> [NSView] {
+        var views: [NSView] = []
+        views.append(separator())
+        views.append(sectionHeader(Strings.text("settings.startup", "Startup")))
+
+        loginCheckbox.target = self
+        loginCheckbox.action = #selector(loginChanged)
+        views.append(withExplanation(
+            loginCheckbox,
+            Strings.text("settings.login.detail",
+                         "Lidwing starts with your Mac. "
+                         + "It still does nothing until you turn it on.")))
+
+        loginNote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        loginNote.textColor = .secondaryLabelColor
+        loginNote.lineBreakMode = .byWordWrapping
+        loginNote.preferredMaxLayoutWidth = 400
+        views.append(loginNote)
+        return views
+    }
+
+    /// Reads the system, never a stored flag. A user can revoke the login item in System
+    /// Settings while Lidwing is not running, and a boolean of ours would then say "on" while
+    /// nothing launches.
+    private func reloadLoginItem() {
+        let presentation = LoginItem.presentation(for: LoginItemController.status)
+        loginCheckbox.isHidden = !presentation.isVisible
+        loginCheckbox.state = presentation.isChecked ? .on : .off
+        loginCheckbox.isEnabled = presentation.isInteractive
+        loginNote.stringValue = presentation.note ?? ""
+        loginNote.isHidden = presentation.note == nil
+    }
+
+    @objc private func loginChanged() {
+        let wanted = loginCheckbox.state == .on
+        if let failure = LoginItemController.set(wanted) {
+            loginNote.stringValue = failure
+            loginNote.isHidden = false
+        }
+        // Re-read either way. macOS is the authority on what actually happened, including the
+        // case where it registers the item and then waits for the user to approve it.
+        reloadLoginItem()
+    }
+
     @objc private func playSound() {
         coordinator.previewChime()
     }
@@ -321,6 +375,7 @@ final class SettingsWindowController: NSWindowController {
         modeControl.selectedSegment = coordinator.machine.mode == .auto ? 1 : 0
         thermalCheckbox.state = settings.thermalGuardEnabled ? .on : .off
         soundCheckbox.state = Preferences.shared.soundEnabled ? .on : .off
+        reloadLoginItem()
     }
 
     @objc private func modeChanged() {
