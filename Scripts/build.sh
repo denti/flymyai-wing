@@ -23,7 +23,10 @@ ARCHS=(arm64 x86_64)
 for product in "${PRODUCTS[@]}"; do
   for arch in "${ARCHS[@]}"; do
     echo "== $product ($arch)"
+    # -g so a dSYM can be produced. A crash report a user pastes is worth nothing without one,
+    # and the symbols are published with every release rather than kept privately.
     swift build -c release --scratch-path ".b-$arch" --product "$product" \
+      -Xswiftc -g \
       -Xswiftc -target -Xswiftc "$arch-apple-macos$MIN" \
       -Xcc     -target -Xcc     "$arch-apple-macos$MIN"
   done
@@ -62,6 +65,14 @@ if [ -f dist/icon_1024.png ]; then
       --out "/tmp/LidwingIcon.iconset/icon_${size}x${size}@2x.png" >/dev/null
   done
   iconutil -c icns /tmp/LidwingIcon.iconset -o "dist/$APP.app/Contents/Resources/AppIcon.icns"
+fi
+
+# Debug symbols for the universal binary. Both slices, never a thinned one: a universal binary
+# has a different debug UUID per architecture and a crash report matches exactly one of them.
+if command -v dsymutil >/dev/null; then
+  dsymutil "dist/$APP.app/Contents/MacOS/$APP" -o "dist/$APP.app.dSYM" 2>/dev/null \
+    && echo "symbols in dist/$APP.app.dSYM" \
+    || echo "dsymutil produced nothing; the release will say so rather than ship a stub"
 fi
 
 echo "built dist/$APP.app  version=$VER build=$BUILD min=$MIN"
