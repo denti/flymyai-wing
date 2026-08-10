@@ -111,6 +111,16 @@ final class AppCoordinator {
         }
     }
 
+    /// Runs the full disarm through the normal path, so the timers stop, the watchdog is told
+    /// and the session record is closed. Calling the state machine directly would leave those
+    /// behind, which is exactly the kind of residue an uninstaller exists to prevent.
+    func prepareForUninstall() {
+        deliver(machine.handle(.appWillTerminate))
+        observers?.stop()
+        observers = nil
+        system.closeUserClient()
+    }
+
     func setSafetySettings(_ settings: SafetySettings) {
         preferences.safetySettings = settings
         machine.settings = settings

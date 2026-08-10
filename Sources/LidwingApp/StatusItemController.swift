@@ -30,6 +30,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         statusItem.menu = menu
 
         statusItem.button?.setAccessibilityLabel("Lidwing")
+
+        // Once, ever, and 400 ms after the item exists so it does not race the menu bar's own
+        // layout. Nothing else happens at launch.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            FirstRun.showLocationCallout(near: self?.statusItem.button)
+        }
     }
 
     // MARK: appearance
@@ -129,6 +135,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         items.append(diagnostics)
         items.append(.separator())
 
+        let uninstall = NSMenuItem(title: "Uninstall Lidwing\u{2026}",
+                                   action: #selector(uninstall), keyEquivalent: "")
+        uninstall.target = self
+        items.append(uninstall)
+
         let about = NSMenuItem(title: "About Lidwing", action: #selector(showAbout),
                                keyEquivalent: "")
         about.target = self
@@ -157,7 +168,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     // MARK: actions
 
     @objc private func toggleProtection() {
+        // The explainer appears here and nowhere else: on the user's first deliberate click,
+        // never at launch, never on a timer, never from an automation path.
+        if !coordinator.machine.state.isProtecting {
+            FirstRun.showExplainerIfNeeded(settings: coordinator.machine.settings)
+        }
+        let wasProtecting = coordinator.machine.state.isProtecting
         coordinator.toggle()
+        if !wasProtecting && coordinator.machine.state == .arming {
+            // Give the verification its window, then show the machine's own answer once ever.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self, self.coordinator.machine.state.isProtecting,
+                      FirstRun.shouldShowProof else { return }
+                FirstRun.showProof()
+            }
+        }
     }
 
     @objc private func repairNow() {
@@ -181,6 +206,32 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
+    }
+
+    /// An app that can stop a Mac from sleeping and cannot remove itself is, definitionally,
+    /// indistinguishable from malware. The removal path is in the menu, not in a document.
+    @objc private func uninstall() {
+        let confirm = NSAlert()
+        confirm.messageText = "Remove Lidwing from this Mac?"
+        confirm.informativeText = Uninstaller.confirmationText()
+        confirm.alertStyle = .warning
+        confirm.addButton(withTitle: "Remove Lidwing")
+        confirm.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+
+        let outcome = Uninstaller.run(coordinator: coordinator)
+        let report = NSAlert()
+        report.messageText = outcome.succeeded ? "Lidwing removed" : "Lidwing was not fully removed"
+        report.informativeText = outcome.lines.joined(separator: "\n")
+            + (outcome.succeeded
+               ? "\n\nDrag Lidwing to the Trash to finish."
+               : "\n\nIf your Mac still will not sleep when you close the lid, restarting it "
+                 + "clears the setting: Lidwing never writes anything that survives a restart.")
+        report.alertStyle = outcome.succeeded ? .informational : .critical
+        report.addButton(withTitle: "OK")
+        report.runModal()
+        if outcome.succeeded { NSApp.terminate(nil) }
     }
 
     @objc private func showAbout() {
