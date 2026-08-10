@@ -1,0 +1,24 @@
+# Never commit the product specification. It lives outside the working copy.
+spec/
+
+# SwiftPM
+.build/
+.b-arm64/
+.b-x86_64/
+dist/
+Package.resolved
+*.xcodeproj
+.swiftpm/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Editors
+*.swp
+.idea/
+.vscode/
+
+# Local scratch
+scratch/
+*.log

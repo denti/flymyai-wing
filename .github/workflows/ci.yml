@@ -1,0 +1,122 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'          # weekly macos-26 canary
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Lidwing
+  BUNDLE_ID: ai.flymy.lidwing
+  MACOS_MIN: '12.0'
+
+jobs:
+  # Fast feedback on the portable half. This is the loop the developer actually lives in:
+  # it needs no macOS runner and it is where every unit test lives.
+  core-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - name: Swift version
+        run: swift --version
+      - name: Build with warnings as errors
+        run: swift build -Xswiftc -warnings-as-errors 2>&1 | tee build.log
+      - name: Unit tests
+        run: swift test 2>&1 | tee linux-test.log
+      - name: Assert the tests actually ran
+        # An empty result is a red result. A suite that collected zero tests has proved
+        # nothing, and a pipeline that reads "no failures" from silence is how a green board
+        # ends up meaning nothing.
+        run: |
+          set -euo pipefail
+          grep -Eq 'Executed [0-9]+ tests' linux-test.log
+          COUNT=$(grep -Eo 'Executed [0-9]+ tests' linux-test.log | head -1 | grep -Eo '[0-9]+')
+          echo "collected $COUNT tests"
+          test "$COUNT" -ge 40
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        if: always()
+        with:
+          name: linux-test-log
+          path: linux-test.log
+
+  # LidwingCore must stay portable: the moment it imports AppKit or IOKit, the whole
+  # Linux-testable architecture is gone and nobody notices until the next Linux build breaks.
+  core-purity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - name: LidwingCore imports nothing platform-specific
+        run: ./Scripts/check-core-purity.sh
+
+  test-macos:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+        with:
+          fetch-depth: 0
+      - name: Select the pinned toolchain
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+          else
+            echo "Xcode 16.4 is not on this image; using the default and recording it."
+            ls -d /Applications/Xcode*.app || true
+          fi
+      - run: swift --version && xcodebuild -version && sw_vers
+      - name: Build with warnings as errors
+        run: swift build -Xswiftc -warnings-as-errors
+      - name: Unit tests
+        run: swift test 2>&1 | tee macos-test.log
+      - name: Assert the tests actually ran
+        run: |
+          set -euo pipefail
+          COUNT=$(grep -Eo 'Executed [0-9]+ tests' macos-test.log | head -1 | grep -Eo '[0-9]+')
+          echo "collected $COUNT tests"
+          test "$COUNT" -ge 40
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        if: always()
+        with:
+          name: macos-test-log
+          path: macos-test.log
+
+  lint:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - name: SwiftLint
+        run: |
+          set -euo pipefail
+          command -v swiftlint >/dev/null || brew install swiftlint
+          swiftlint --version
+          swiftlint lint --strict --reporter github-actions-logging
+
+  # Early warning for the next macOS. When this turns red, the migration is a two-line change
+  # and we find out before a user does.
+  canary-26:
+    runs-on: macos-26
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+        with:
+          fetch-depth: 0
+      - run: xcodebuild -version && sw_vers
+      - run: swift build -c release 2>&1 | tail -40
+      - run: swift test 2>&1 | tail -40

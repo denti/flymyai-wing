@@ -1,0 +1,5 @@
+# Codex configuration
+model = "gpt-5-codex"
+
+[tui]
+theme = "dark"   # trailing comment survives

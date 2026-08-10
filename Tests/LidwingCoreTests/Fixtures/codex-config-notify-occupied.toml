@@ -1,0 +1,6 @@
+# Codex configuration
+model = "gpt-5-codex"
+notify = ["/Applications/SkyComputerUse.app/Contents/MacOS/SkyComputerUseClient", "--codex"]
+
+[tui]
+theme = "dark"

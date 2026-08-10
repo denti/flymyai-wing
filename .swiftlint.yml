@@ -1,0 +1,82 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - dist
+
+# Run with --strict in CI: every warning is a failure.
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - joined_default_parameter
+  - literal_expression_end_indentation
+  - operator_usage_whitespace
+  - overridden_super_call
+  - redundant_nil_coalescing
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - yoda_condition
+
+disabled_rules:
+  - todo   # there are none; the rule only fires on the word inside prose comments
+
+line_length:
+  warning: 110
+  error: 140
+  ignores_comments: false
+  ignores_urls: true
+
+file_length:
+  warning: 600
+  error: 900
+
+type_body_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 80
+  error: 120
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  excluded: [id, on, at, kr, os, t0, pc]
+
+nesting:
+  type_level: 2
+
+force_unwrapping:
+  severity: warning
+
+# Tests may force-unwrap and may be long: a test that hides its intent behind guard-let
+# ceremony is a worse test.
+force_try:
+  severity: warning
+
+custom_rules:
+  no_pmset_shellout:
+    name: "No pmset shell-out outside diagnostics"
+    regex: '"/usr/bin/pmset"'
+    match_kinds: [string]
+    message: "Control decisions never parse pmset output. Read IOKit through SystemFacade."
+    severity: error
+    excluded: ".*Diagnostics.*"
+  no_ioreg_shellout:
+    name: "No ioreg shell-out outside diagnostics"
+    regex: '"/usr/sbin/ioreg"'
+    match_kinds: [string]
+    message: "ioreg text is 50-100 ms per call and prints unsigned garbage for negative amperage."
+    severity: error
+    excluded: ".*Diagnostics.*"
