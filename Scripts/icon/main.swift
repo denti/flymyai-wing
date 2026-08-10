@@ -3,8 +3,11 @@
 // Run at build time rather than committed as a binary asset, so there is exactly one
 // definition of the shape and no chance of the icon and the menu-bar glyph drifting apart.
 //
-//   swiftc -O -o /tmp/make-icon Scripts/make-icon.swift Sources/LidwingCore/WingGeometry.swift
+//   swiftc -O -o /tmp/make-icon Scripts/icon/main.swift Sources/LidwingCore/WingGeometry.swift
 //   /tmp/make-icon Resources/icon_1024.png
+//
+// The file is called main.swift because Swift allows top-level code only there when more than
+// one file is being compiled.
 //
 // Full-bleed and square, with **no pre-rounded corners and no exported canvas mask**: macOS
 // applies its own mask, and providing one degrades the specular highlight and leaves jagged

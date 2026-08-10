@@ -9,7 +9,7 @@
 | `notarize.sh` | `notarytool submit --wait` then `stapler`. Needs an App Store Connect API key. | macOS |
 | `package.sh` | `.dmg` and `.zip`, plus `SHA256SUMS.txt`. | macOS |
 | `invariants.sh` | Assertions about the built artifact: universal, `minos`, hardened, no usage descriptions, no network entitlement. | macOS |
-| `make-icon.swift` | Renders the app icon from the same wing geometry the menu bar uses. | macOS |
+| `icon/main.swift` | Renders the app icon from the same wing geometry the menu bar uses. | macOS |
 
 ## One-time setup on the Linux box
 

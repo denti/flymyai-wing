@@ -48,7 +48,8 @@ cp Resources/ai.flymy.lidwing.watchdog.plist "dist/$APP.app/Contents/Library/Lau
 
 # The app icon, generated from the same wing geometry the menu-bar glyph uses, so the two
 # cannot drift apart.
-swiftc -O -o "$(pwd)/.b-arm64/make-icon" Scripts/make-icon.swift Sources/LidwingCore/WingGeometry.swift
+swiftc -O -o "$(pwd)/.b-arm64/make-icon" \
+  Scripts/icon/main.swift Sources/LidwingCore/WingGeometry.swift
 "$(pwd)/.b-arm64/make-icon" dist/icon_1024.png
 
 if [ -f dist/icon_1024.png ]; then
