@@ -22,7 +22,7 @@ final class AppCoordinator {
     /// Set when a coding agent says it is blocked, cleared when the user opens the menu.
     /// Advisory only: invariant I8 means nothing on that socket can arm anything, and this
     /// property is the entire extent of its reach into the app.
-    private(set) var agentIsWaiting: (source: String, at: Date)?
+    var agentIsWaiting: (source: String, at: Date)?
 
     private var verifyTimer: DispatchSourceTimer?
     private var reassertTimer: DispatchSourceTimer?
@@ -31,8 +31,10 @@ final class AppCoordinator {
     private var lastSeenAgents: Set<String> = []
     private var activity: NSObjectProtocol?
 
-    private(set) var lastFailureAt: Date?
-    private(set) var armedSince: Date?
+    // `private(set)` would confine the setter to this file, and the code that observes a
+    // failure lives in the presentation extension next door.
+    var lastFailureAt: Date?
+    var armedSince: Date?
     /// Set once the user has been asked, so a notification prompt never appears at launch.
     var askedForNotificationPermission = false
 

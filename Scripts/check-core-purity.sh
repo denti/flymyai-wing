@@ -33,6 +33,28 @@ if grep -rEn '^    (var|let) [a-zA-Z_]+ *(:|=)' Sources/*/*+*.swift 2>/dev/null;
   FAIL=1
 fi
 
+# A type split across `Foo.swift` and `Foo+Bar.swift` cannot use `private` for anything the
+# other file touches: `private` is file-scoped in Swift, and `private(set)` confines the setter
+# to the declaring file. Both are compile errors that only a macOS runner would see, because
+# the Darwin-only targets are never built here. This has cost two round trips already.
+#
+# The check is deliberately precise: a `private` member the sibling never mentions is correct
+# encapsulation, and flagging it would push everything to `internal` for no reason.
+for split in Sources/*/*+*.swift; do
+  [ -e "$split" ] || continue
+  base="${split%%+*}.swift"
+  [ -e "$base" ] || continue
+  while read -r name; do
+    [ -n "$name" ] || continue
+    if grep -qE "(^|[^A-Za-z0-9_.])${name}([^A-Za-z0-9_]|$)" "$split"; then
+      echo "FAIL: $(basename "$base") declares '$name' private, and $(basename "$split") uses it."
+      echo "      private is file-scoped in Swift. Make it internal, or move the use."
+      FAIL=1
+    fi
+  done < <(grep -oE '^ *private(\(set\))? +(var|let|func) +[A-Za-z_][A-Za-z0-9_]*' "$base" \
+           | awk '{print $NF}')
+done
+
 if [ "$FAIL" -eq 0 ]; then
   # Assert on real output, never on the absence of an error: prove we actually looked at files.
   COUNT=$(find "$CORE" -name '*.swift' | wc -l | tr -d ' ')
