@@ -40,6 +40,7 @@ jobs:
         # An empty result is a red result. A suite that collected zero tests has proved
         # nothing, and a pipeline that reads "no failures" from silence is how a green board
         # ends up meaning nothing.
+        shell: bash          # the swift:6.0 image's /bin/sh is dash: no `set -o pipefail`
         run: |
           set -euo pipefail
           grep -Eq 'Executed [0-9]+ tests' linux-test.log
@@ -109,10 +110,14 @@ jobs:
 
   # Early warning for the next macOS. When this turns red, the migration is a two-line change
   # and we find out before a user does.
+  #
+  # Deliberately NOT `continue-on-error`. That flag makes the job report success whatever its
+  # steps did, which is the "empty result reads as a pass" failure mode this project treats as
+  # a bug. It is kept out of the required-checks list in branch protection instead, so a red
+  # canary is visible without blocking a merge.
   canary-26:
     runs-on: macos-26
     timeout-minutes: 25
-    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
         with:

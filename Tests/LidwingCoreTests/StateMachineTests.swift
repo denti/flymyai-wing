@@ -16,8 +16,9 @@ final class StateMachineTests: XCTestCase {
 
         let verify = machine.handle(.verifyTick)
         XCTAssertEqual(machine.state, .armed)
-        XCTAssertTrue(verify.contains(.chime(.armed)))
         XCTAssertTrue(verify.contains(.startTimer(.reassert)))
+        XCTAssertFalse(verify.contains(.chime(.sealed)),
+                       "no sound for something the user is looking at")
         XCTAssertEqual(watchdog.sent.first, .armed(bootSession: "BOOT-0000", pid: 4412))
     }
 
@@ -117,6 +118,53 @@ final class StateMachineTests: XCTestCase {
         system.advance(3600)
         let second = machine.handle(.userArm)
         XCTAssertFalse(second.contains(.notify(.bagWarning)))
+    }
+
+    // MARK: the sound that matters
+
+    /// The defining moment of the product: the lid shuts and the Mac keeps running. At that
+    /// instant the screen is not an output channel, so this is the only confirmation the user
+    /// can actually receive.
+    func testClosingTheLidWhileArmedChimesExactlyOnce() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        system.lidState = .closed
+        let closing = machine.handle(.lidChanged(.closed))
+        XCTAssertTrue(closing.contains(.chime(.sealed)))
+
+        // Four non-lid events also deliver a clamshell notification, and it arrives twice per
+        // transition. Diffing rather than counting is what stops a charger plug from sounding
+        // like a lid close.
+        let again = machine.handle(.lidChanged(.closed))
+        XCTAssertFalse(again.contains(.chime(.sealed)))
+        XCTAssertFalse(machine.handle(.clamshellNotification).contains(.chime(.sealed)))
+        XCTAssertFalse(machine.handle(.powerSourceChanged).contains(.chime(.sealed)))
+    }
+
+    func testStandingDownWithTheLidClosedChimes() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        system.lidState = .closed
+        machine.handle(.lidChanged(.closed))
+
+        system.batteryCurrent = 900
+        machine.handle(.reconcileTick)
+        system.advance(SafetyPolicy.debounceInterval + 0.1)
+        machine.handle(.reconcileTick)
+        XCTAssertEqual(machine.state, .disarming)
+
+        system.clamshellCausesSleep = true
+        let effects = machine.handle(.verifyTick)
+        XCTAssertTrue(effects.contains(.chime(.standingDown)),
+                      "the user cannot see the screen; tell them the Mac is going to sleep")
+    }
+
+    func testClosingTheLidWhileIdleIsSilent() {
+        let (_, _, _, _, machine) = TestFixture.harness()
+        XCTAssertFalse(machine.handle(.lidChanged(.closed)).contains(.chime(.sealed)))
     }
 
     // MARK: re-assertion
@@ -309,7 +357,8 @@ final class StateMachineTests: XCTestCase {
 
         let effects = machine.handle(.verifyTick)
         XCTAssertEqual(machine.state, .idle)
-        XCTAssertTrue(effects.contains(.chime(.disarmed)))
+        XCTAssertFalse(effects.contains(.chime(.standingDown)),
+                       "the lid is open; the menu already said it")
         XCTAssertNil(ledger.currentLedger)
         XCTAssertEqual(audit.records.count, 1)
         XCTAssertEqual(audit.records.first?.reason, .user)

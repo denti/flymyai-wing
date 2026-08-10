@@ -67,9 +67,18 @@ public enum LidwingTimer: String, Equatable, Sendable {
     case reconcile
 }
 
+/// Sound is a courtesy channel for the moment the screen is not one.
+///
+/// The rule: never play for something the user can see, always play for something they
+/// cannot. Toggling from the menu with the lid open plays nothing — the checkmark and the
+/// glyph already said it, and a sound there trains the user to mute us, after which the sound
+/// that matters never lands.
 public enum Chime: String, Equatable, Sendable {
-    case armed
-    case disarmed
+    /// The lid just closed and we are protecting. This is the one that matters.
+    case sealed
+    /// We stood down while the lid was closed: the Mac is about to sleep normally.
+    case standingDown
+    /// Something failed.
     case failure
 }
 
@@ -197,6 +206,9 @@ public final class StateMachine {
     private var agentGracePeriod: TimeInterval = 300
     private var agentGoneSince: Date?
     private var lastBagWarningAt: Date?
+    /// Last known lid position, so a chime fires on the transition and not on every one of the
+    /// four non-lid events that also deliver a clamshell notification.
+    private var lidWasClosed = false
 
     /// How long a write has to take effect before we call it a lie.
     public static let verifyDeadline: TimeInterval = 2.0
@@ -279,8 +291,12 @@ public final class StateMachine {
         case .systemHasPoweredOn:
             return onSystemHasPoweredOn()
 
-        case .clamshellNotification, .displayReconfigured, .powerSourceChanged,
-             .lidChanged(_), .reassertTick:
+        case .lidChanged(let lid):
+            let justClosed = (lid == .closed && lidWasClosed == false)
+            lidWasClosed = (lid == .closed)
+            return onReassertTrigger(lidJustClosed: justClosed)
+
+        case .clamshellNotification, .displayReconfigured, .powerSourceChanged, .reassertTick:
             return onReassertTrigger()
 
         case .thermalChanged:
@@ -505,9 +521,9 @@ public final class StateMachine {
         var effects: [LidwingEffect] = [
             .stopTimer(.verify),
             .startTimer(.reassert),
-            .startTimer(.reconcile),
-            .chime(.armed)
+            .startTimer(.reconcile)
         ]
+        // No chime here. The user is looking at the menu they just clicked.
         if !hasEverArmed {
             hasEverArmed = true
             effects.append(.notify(.firstArm))
@@ -526,7 +542,12 @@ public final class StateMachine {
         pendingDisarmReason = nil
         lastGroundTruthVerifiedAt = nil
 
-        var effects: [LidwingEffect] = [.stopTimer(.verify), .endActivity, .chime(.disarmed)]
+        var effects: [LidwingEffect] = [.stopTimer(.verify), .endActivity]
+        if lidWasClosed {
+            // The screen is not an output channel right now, so this is the one confirmation
+            // the user can actually receive: the Mac is about to sleep normally.
+            effects.append(.chime(.standingDown))
+        }
         if reason.userFacingSentence != nil {
             effects.append(.notify(.autoDisarmed(reason)))
         }
@@ -535,7 +556,7 @@ public final class StateMachine {
 
     // MARK: Re-assertion
 
-    private func onReassertTrigger() -> [LidwingEffect] {
+    private func onReassertTrigger(lidJustClosed: Bool = false) -> [LidwingEffect] {
         guard state.isProtecting else { return [] }
         // Idempotent by construction: the kernel term is a bit mask, and re-setting a set bit
         // is a no-op that also re-runs the clamshell evaluation, which refreshes the property
@@ -547,7 +568,9 @@ public final class StateMachine {
             _ = facade.setIdleAssertion(true)
         }
         watchdog.send(.heartbeat(at: facade.now))
-        return []
+        // The defining moment of this product: the lid just shut and the Mac is still running.
+        // The user cannot see anything, so say it out loud.
+        return lidJustClosed ? [.chime(.sealed)] : []
     }
 
     // MARK: Reconciliation while armed

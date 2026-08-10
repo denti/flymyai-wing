@@ -1,0 +1,135 @@
+import Foundation
+import AppKit
+import ServiceManagement
+import LidwingCore
+import LidwingSystem
+
+/// Gets `lidwingd` running, without ever asking for a password.
+///
+/// Any process can call selector 12, so the dead-man needs no privilege at all. That is the
+/// whole reason this is a user LaunchAgent and not a daemon, and it is why installing it
+/// produces no dialog.
+///
+/// Two paths, tried in order:
+///
+/// 1. **`SMAppService.agent`** on macOS 13+. The modern, visible-in-System-Settings route.
+///    It requires a properly signed bundle and returns `kSMErrorInvalidSignature` otherwise,
+///    which is exactly the situation an ad-hoc development build is in.
+/// 2. **`launchctl bootstrap gui/$UID`** with a plist in `~/Library/LaunchAgents`. The
+///    documented pre-13 route, and the fallback whenever the first one cannot work.
+///
+/// The fallback is not a workaround for a signing problem we should be fixing — it is the only
+/// mechanism that exists on macOS 12, which is this product's floor.
+enum WatchdogInstaller {
+
+    static var agentPlistName: String { "\(LidwingID.watchdogLabel).plist" }
+
+    /// The watchdog binary. Inside a built `.app` it sits in `Contents/Resources`; during
+    /// development it sits beside the executable.
+    static func watchdogExecutableURL() -> URL? {
+        let candidates = [
+            Bundle.main.resourceURL?.appendingPathComponent("lidwingd"),
+            Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("lidwingd")
+        ].compactMap { $0 }
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    /// App Translocation check.
+    ///
+    /// A quarantined app launched from `~/Downloads` runs from a randomised, read-only
+    /// `/private/var/folders/.../AppTranslocation/<UUID>/d/` path. Any launchd plist recording
+    /// that path breaks the moment the app quits, and the user is left with a watchdog that
+    /// points at a mount that no longer exists.
+    static var isTranslocated: Bool {
+        Bundle.main.bundleURL.path.contains("/AppTranslocation/")
+    }
+
+    @discardableResult
+    static func ensureRunning() -> Bool {
+        guard !isTranslocated else { return false }
+        if registerWithServiceManagement() { return true }
+        return bootstrapWithLaunchctl()
+    }
+
+    private static func registerWithServiceManagement() -> Bool {
+        guard #available(macOS 13.0, *) else { return false }
+        // Only meaningful for a real bundle: the plist has to be inside
+        // Contents/Library/LaunchAgents for SMAppService to find it.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return false }
+        let service = SMAppService.agent(plistName: agentPlistName)
+        if service.status == .enabled { return true }
+        do {
+            try service.register()
+            return service.status == .enabled || service.status == .requiresApproval
+        } catch {
+            // kSMErrorInvalidSignature on an ad-hoc build lands here, and it is expected
+            // during development. Fall through to launchctl rather than failing to protect.
+            return false
+        }
+    }
+
+    private static func bootstrapWithLaunchctl() -> Bool {
+        guard let executable = watchdogExecutableURL() else { return false }
+        let agentsDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+        try? FileManager.default.createDirectory(at: agentsDirectory,
+                                                 withIntermediateDirectories: true)
+        let plistURL = agentsDirectory.appendingPathComponent(agentPlistName)
+
+        let plist: [String: Any] = [
+            "Label": LidwingID.watchdogLabel,
+            "ProgramArguments": [executable.path],
+            "RunAtLoad": true,
+            "KeepAlive": true,
+            "ProcessType": "Background",
+            "StandardErrorPath": SupportDirectory.file("lidwingd.log").path
+        ]
+        guard let data = try? PropertyListSerialization.data(fromPropertyList: plist,
+                                                             format: .xml, options: 0) else {
+            return false
+        }
+        // Rewrite unconditionally: the path changes when the app moves, and a plist pointing
+        // at a binary that is no longer there is a watchdog that silently does not exist.
+        try? data.write(to: plistURL, options: .atomic)
+
+        let uid = getuid()
+        // `bootout` first so an updated plist is actually picked up. launchd does not reload a
+        // changed plist on its own, and the failure is silent.
+        run("/bin/launchctl", ["bootout", "gui/\(uid)/\(LidwingID.watchdogLabel)"])
+        let bootstrapped = run("/bin/launchctl", ["bootstrap", "gui/\(uid)", plistURL.path])
+        if !bootstrapped {
+            // Very old path, still present, and harmless if the modern one already worked.
+            run("/bin/launchctl", ["load", "-w", plistURL.path])
+        }
+        return true
+    }
+
+    /// Remove every trace. Called by the uninstaller and by a failed install, so it must be
+    /// safe to run when nothing is installed.
+    static func remove() {
+        if #available(macOS 13.0, *), Bundle.main.bundleURL.pathExtension == "app" {
+            try? SMAppService.agent(plistName: agentPlistName).unregister()
+        }
+        let uid = getuid()
+        run("/bin/launchctl", ["bootout", "gui/\(uid)/\(LidwingID.watchdogLabel)"])
+        let plistURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(agentPlistName)")
+        try? FileManager.default.removeItem(at: plistURL)
+    }
+
+    @discardableResult
+    private static func run(_ path: String, _ arguments: [String]) -> Bool {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = arguments
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        do {
+            try task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+}
