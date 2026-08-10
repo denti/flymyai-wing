@@ -460,7 +460,13 @@ Two more findings, both the same antipattern, number 18:
 `NSApp.activate` within fifteen lines of every `runModal()` in the app target. My own by-hand
 pass over the same twelve call sites had missed it.
 
-**Round 8 verdict:** eleven defects, nine of them user-visible, none of them capable of stranding
+### One more, from CI going red on its own
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 8.12 | **A flaky test, on the case that guards the round 5 defect.** The slow-writer case delayed the payload 50 ms against the helper's 100 ms stdin budget. That is a 2x margin, and a loaded macOS runner overran it: the helper correctly gave up, sent an empty body and exited, and the writer's `echo` died with `EPIPE`. The assertion was right and the margin was wrong. A flaky test on the payload-loss defect is worse than most flakes, because the response to a flake is to re-run it. | Medium | 10 ms against 100 ms, and it retries. A non-blocking read loses the payload on *every* attempt, so retrying cannot hide the defect - verified by restoring the non-blocking read, which failed all three attempts. The attempt count is printed, so a degraded machine is visible rather than silently tolerated. |
+
+**Round 8 verdict:** twelve defects, nine of them user-visible, none of them capable of stranding
 a Mac. The pattern worth naming: every one of them was invisible to the tests because the tests
 check what the code does, and these were all cases of the code doing something perfectly well
 for a case that never arrives — a cast that never matches, a notification never subscribed, a

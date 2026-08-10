@@ -15,8 +15,10 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
-  binary, 12 528 bytes, no warnings at `-Wall -Wextra -Werror`, and **4 ms with no listener**
-  against a 150 ms budget. Running it found a real defect — see below.
+  binary, 12 528 bytes, no warnings at `-Wall -Wextra -Werror`, and **5 ms with no listener**
+  against a 150 ms budget. Running it found a real defect — see below. Its slow-writer case was
+  flaky against a 2x timing margin and is now 10 ms against 100 ms with retries, proven still
+  able to catch the defect it exists for.
 - **A `.dmg` exists.** `Scripts/build.sh` → `sign.sh` → `package.sh` → `invariants.sh` runs
   end to end on every push. All **14 artifact invariants** are green on the real artifact:
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,

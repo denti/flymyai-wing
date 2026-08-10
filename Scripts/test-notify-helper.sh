@@ -208,23 +208,58 @@ fi
 # makes the race deterministic by delaying the write, so the test can tell the two
 # implementations apart.
 
+# The delay is 10 ms against the helper's 100 ms budget. It used to be 50 ms, which is only a
+# 2x margin, and on a loaded CI runner a `sleep 0.05` can genuinely overrun 100 ms - at which
+# point the helper correctly gives up, sends an empty body, exits, and the writer's echo dies
+# with EPIPE. That is exactly what happened on macOS in run 31427570805: the listener received
+# `{"v":1,"src":"claude","body":""}` and the shell reported a broken pipe.
+#
+# The margin is what was wrong, not the assertion. The two implementations are still told apart
+# by *any* delay, because a non-blocking read loses the payload even at 1 ms, and the helper
+# needs a few ms to start - so 10 ms keeps every bit of the discriminating power at 10x the
+# headroom.
+#
+# It also retries. A non-blocking read loses the payload on every single attempt, so retrying
+# cannot hide that defect; a descheduled runner loses it once. The attempt count is printed
+# either way, so a degraded machine is visible instead of silently tolerated.
+slow_writer_attempt() {
+  local delay="$1" received="$2"
+  rm -f "$received" "$SOCKET"
+  "$WORK/listener" "$SOCKET" "$received" &
+  local listener=$!
+  local waited=0
+  while [ ! -S "$SOCKET" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  # `2>/dev/null` on the writer: if the helper has already given up, the echo dies with EPIPE,
+  # and that shell diagnostic is a symptom of the case under test rather than an error in it.
+  ( sleep "$delay"; echo '{"delayed":"payload"}' 2>/dev/null ) | "$WORK/lidwing-notify" --claude
+  wait "$listener" 2>/dev/null
+  local status=$?
+  if [ "$status" -eq 7 ]; then return 7; fi
+  grep -q "delayed" "$received" 2>/dev/null
+}
+
 SLOW_RECEIVED="$WORK/received-slow.txt"
-"$WORK/listener" "$SOCKET" "$SLOW_RECEIVED" &
-SLOW_LISTENER=$!
-for _ in $(seq 1 50); do
-  [ -S "$SOCKET" ] && break
-  sleep 0.1
+SLOW_OK=0
+SLOW_TRIES=0
+for attempt in 1 2 3; do
+  SLOW_TRIES="$attempt"
+  if slow_writer_attempt 0.01 "$SLOW_RECEIVED"; then
+    SLOW_OK=1
+    break
+  fi
 done
 
-( sleep 0.05; echo '{"delayed":"payload"}' ) | "$WORK/lidwing-notify" --claude
-wait "$SLOW_LISTENER" 2>/dev/null
-SLOW_STATUS=$?
-[ "$SLOW_STATUS" -eq 7 ] && bad "the listener timed out waiting for the delayed payload"
-
-if grep -q "delayed" "$SLOW_RECEIVED" 2>/dev/null; then
-  ok "a payload written 50ms late still arrives"
+if [ "$SLOW_OK" -eq 1 ]; then
+  if [ "$SLOW_TRIES" -eq 1 ]; then
+    ok "a payload written 10ms late still arrives"
+  else
+    ok "a payload written 10ms late still arrives (took $SLOW_TRIES attempts - loaded machine)"
+  fi
 else
-  bad "lost a payload the caller wrote 50ms late: $(cat "$SLOW_RECEIVED" 2>/dev/null)"
+  bad "lost a payload written 10ms late, three times over: $(cat "$SLOW_RECEIVED" 2>/dev/null)"
 fi
 
 # ------------------------------------------------------------------ chaining
