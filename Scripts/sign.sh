@@ -30,8 +30,14 @@ for macho in "$CONTENTS/Resources/lidwingd" "$CONTENTS/Resources/lidwing-notify"
   codesign --force --options runtime "${TIMESTAMP[@]}" --sign "$IDENTITY" "$macho"
 done
 
-codesign --force --options runtime "${TIMESTAMP[@]}" \
-         --entitlements Resources/app.entitlements --sign "$IDENTITY" "dist/$APP.app"
+# No --entitlements, and that is the point: Lidwing requests nothing.
+#
+# An empty entitlements plist would be equivalent, except that it is a file someone can add a
+# line to. With no file at all, `codesign -d --entitlements - Lidwing.app` prints nothing, and
+# the absence of `com.apple.security.network.client` - which is what makes the no-telemetry
+# claim checkable offline on the downloaded binary - is a property of the artifact rather than
+# a promise in a document. Scripts/invariants.sh asserts it.
+codesign --force --options runtime "${TIMESTAMP[@]}" --sign "$IDENTITY" "dist/$APP.app"
 
 codesign --verify --deep --strict --verbose=2 "dist/$APP.app"
 echo "signed"

@@ -7,6 +7,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     private let statusItem: NSStatusItem
     private let coordinator: AppCoordinator
+    private lazy var settingsWindow = SettingsWindowController(coordinator: coordinator)
 
     init(coordinator: AppCoordinator) {
         self.coordinator = coordinator
@@ -129,6 +130,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         sleepNow.target = self
         items.append(sleepNow)
 
+        let settings = NSMenuItem(title: "Settings\u{2026}", action: #selector(showSettings),
+                                  keyEquivalent: ",")
+        settings.target = self
+        items.append(settings)
+
         let diagnostics = NSMenuItem(title: "Copy Diagnostics", action: #selector(copyDiagnostics),
                                      keyEquivalent: "")
         diagnostics.target = self
@@ -191,6 +197,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func sleepNow() {
         coordinator.sleepNow()
+    }
+
+    @objc private func showSettings() {
+        settingsWindow.show()
     }
 
     @objc private func copyDiagnostics() {

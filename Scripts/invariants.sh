@@ -85,10 +85,18 @@ else
 fi
 
 # The structural proof of the no-telemetry claim, checkable offline on the downloaded binary.
-if codesign -d --entitlements - "$BUNDLE" 2>/dev/null | grep -q 'com.apple.security.network.client'; then
+# Lidwing is signed with no entitlements at all, so this output is empty rather than merely
+# free of the network key.
+ENTITLEMENTS="$(codesign -d --entitlements - "$BUNDLE" 2>/dev/null || true)"
+if printf '%s' "$ENTITLEMENTS" | grep -q 'com.apple.security.network.client'; then
   check 1 "no network-client entitlement"
 else
   check 0 "no network-client entitlement"
+fi
+if printf '%s' "$ENTITLEMENTS" | grep -q 'com.apple.security'; then
+  echo "  note  the bundle declares entitlements: $(printf '%s' "$ENTITLEMENTS" | tr -d '\n')"
+else
+  check 0 "the bundle declares no entitlements at all"
 fi
 
 # The legacy privileged-helper layout. Its presence would mean someone reintroduced a root

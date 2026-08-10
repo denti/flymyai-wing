@@ -123,6 +123,10 @@ final class AppCoordinator {
         system.closeUserClient()
     }
 
+    func soundEnabledChanged() {
+        chimes.enabled = preferences.soundEnabled
+    }
+
     func setSafetySettings(_ settings: SafetySettings) {
         preferences.safetySettings = settings
         machine.settings = settings
@@ -158,6 +162,7 @@ final class AppCoordinator {
     // MARK: effects out
 
     private func deliver(_ effects: [LidwingEffect]) {
+        var needsRefresh = false
         for effect in effects {
             switch effect {
             case .startTimer(let timer):
@@ -177,13 +182,13 @@ final class AppCoordinator {
             case .offerRepair(let cause):
                 presentRepair(cause)
             case .showForeignHolder:
-                onStateChange?()
+                needsRefresh = true
             case .beginActivity:
                 beginActivity()
             case .endActivity:
                 endActivity()
             case .uiNeedsRefresh:
-                onStateChange?()
+                needsRefresh = true
             }
         }
         if preferences.hasEverArmed != machine.hasEverArmed {
@@ -194,7 +199,7 @@ final class AppCoordinator {
         // Refresh only when the user-visible state actually changed. `deliver` runs on every
         // reconcile tick, and re-rendering the status item twelve times a minute for a picture
         // that has not changed is exactly the idle work this app promises not to do.
-        if machine.state != lastPresentedState {
+        if needsRefresh || machine.state != lastPresentedState {
             lastPresentedState = machine.state
             onStateChange?()
         }
