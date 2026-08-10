@@ -427,6 +427,10 @@ extension StateMachine {
         return [.startTimer(.verify)]
     }
 
+    /// The machine slept, and the attempt to protect it again did not work either. This is the
+    /// end of the session, and the user has to be told: they went to sleep expecting an
+    /// eight-hour run and it is over. Standing down silently here would be the quietest
+    /// possible way to lose somebody's night of work.
     func finishFailedSession(reason: DisarmReason) -> [LidwingEffect] {
         releaseMechanism()
         watchdog.send(.disarmed)
@@ -434,7 +438,12 @@ extension StateMachine {
         ledgerStore.delete()
         finishSession(reason: reason)
         state = .idle
-        return [.stopTimer(.reassert), .stopTimer(.reconcile), .endActivity, .uiNeedsRefresh]
+        var effects: [LidwingEffect] = [.stopTimer(.reassert), .stopTimer(.reconcile),
+                                        .endActivity, .chime(.failure)]
+        if reason.userFacingSentence != nil {
+            effects.append(.notify(.autoDisarmed(reason)))
+        }
+        return effects
     }
 
     // MARK: Watchdog

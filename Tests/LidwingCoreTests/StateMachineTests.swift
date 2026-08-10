@@ -708,3 +708,45 @@ final class NoLidTests: XCTestCase {
         XCTAssertEqual(machine.state, .armed, "a protected session was ended by a probe")
     }
 }
+
+/// What happens after the machine slept and the recovery did not work either. The user went to
+/// sleep expecting an overnight run; standing down silently would be the quietest possible way
+/// to lose it for them.
+final class FailedRecoveryTests: XCTestCase {
+
+    func testAFailedReArmTellsTheUserRatherThanGoingQuiet() {
+        let (system, _, _, watchdog, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        machine.handle(.systemWillSleep(argument: 1))
+        XCTAssertEqual(machine.state, .failed)
+
+        // The socket did not survive the sleep and cannot be re-established, so there is no
+        // dead-man and we refuse to hold the bit (invariant I2).
+        watchdog.disconnect()
+        watchdog.canConnect = false
+        let effects = machine.handle(.systemHasPoweredOn)
+
+        XCTAssertEqual(machine.state, .idle)
+        XCTAssertTrue(effects.contains(.chime(.failure)))
+        XCTAssertTrue(effects.contains(.notify(.autoDisarmed(.watchdogLost))),
+                      "the session ended and the user was not told: \(effects)")
+        _ = system
+    }
+
+    func testTheRecordStillCarriesTheSleepEvenWhenTheReasonIsSomethingElse() {
+        let (_, _, audit, watchdog, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        machine.handle(.systemWillSleep(argument: 1))
+        watchdog.disconnect()
+        watchdog.canConnect = false
+        machine.handle(.systemHasPoweredOn)
+
+        let record = audit.records.last
+        XCTAssertEqual(record?.reason, .watchdogLost)
+        XCTAssertEqual(record?.groundTruthFailures, 1, "the sleep vanished from the record")
+        XCTAssertTrue(record?.failures.contains(.sleptWhileArmed) ?? false)
+        XCTAssertFalse(record?.isCleanSoak ?? true)
+    }
+}
