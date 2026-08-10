@@ -44,6 +44,21 @@ enum WatchdogInstaller {
         Bundle.main.bundleURL.path.contains("/AppTranslocation/")
     }
 
+    /// Whether the app is somewhere a launchd agent can point at for the life of a session.
+    ///
+    /// Two places are genuinely broken: a **translocated** bundle, which runs from a randomised
+    /// read-only mount that evaporates when the app quits, and `~/Downloads`, which is where a
+    /// still-quarantined app lives right before it becomes translocated on the next launch. A
+    /// plist recording either path is a watchdog pointing at nothing.
+    ///
+    /// Deliberately **not** a requirement to live in `/Applications`. Apple recommends it, and
+    /// for a *daemon* that has to run before login it is a hard requirement — but this is a
+    /// user agent, and `~/Applications` is a perfectly ordinary place for someone to keep an
+    /// app. Refusing to work there would be us enforcing a rule that does not apply to us.
+    static var isInAStablePlace: Bool {
+        !isTranslocated && !Bundle.main.bundleURL.path.contains("/Downloads/")
+    }
+
     @discardableResult
     static func ensureRunning() -> Bool {
         guard !isTranslocated else { return false }

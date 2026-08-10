@@ -130,6 +130,16 @@ final class AppCoordinator {
             deliver(machine.handle(.userDisarm))
             return
         }
+        // Checked before the state machine sees the request, because the honest message here
+        // is "move me", not "the watchdog would not start" — which is what the machine would
+        // otherwise report, since a translocated bundle cannot register a launchd agent that
+        // outlives it.
+        guard WatchdogInstaller.isInAStablePlace else {
+            log.emit(LogCatalogue.armRefused, .power, ["reason": "notInApplications"])
+            presentRefusal(.notInApplications)
+            return
+        }
+
         let power = PowerSourceReader.read()
         let sample = PowerSample(onAC: power.onAC, current: power.current, max: power.max,
                                  warning: power.warning)
