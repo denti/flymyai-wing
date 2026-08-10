@@ -21,7 +21,6 @@ enum LidwingMain {
             // `runModal` until they find it in Mission Control.
             application.activate(ignoringOtherApps: true)
             let alert = NSAlert()
-            Strings.localiser = Translations.localiser(for: Locale.preferredLanguages)
             alert.messageText = Strings.text("dialog.alreadyRunning.title",
                                              "Lidwing is already running")
             alert.informativeText = Strings.text("dialog.alreadyRunning.body",
@@ -57,7 +56,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Pick the user's language before anything draws. English is the fallback, and a key
         // with no translation renders in English rather than vanishing.
-        Strings.localiser = Translations.localiser(for: Locale.preferredLanguages)
 
         MainMenu.install(into: NSApplication.shared)
         coordinator.start()

@@ -429,8 +429,87 @@ final class StateMachineTests: XCTestCase {
         let effects = machine.handle(.launch)
 
         XCTAssertEqual(machine.state, .repair)
-        XCTAssertEqual(effects.first, .offerRepair(.noLedger))
+        XCTAssertEqual(effects.first, .offerRepair(.noLedger, .quietly))
         XCTAssertTrue(system.clamshellWrites.isEmpty, "launch must never clear a bit on its own")
+    }
+
+    // MARK: armed but owned by nobody
+    //
+    // The state a real Mac was in when Lidwing first launched on it: a spike probe had set the
+    // clamshell bit from a different process and been interrupted without disarming. It is not a
+    // synthetic case - a crashed previous instance, a second copy of the app, or another utility
+    // produces exactly the same thing, because the bit is global, unowned and carries no
+    // reference count. Lidwing found the mechanism armed while owning nothing, went down the
+    // repair path, and crashed presenting a modal from inside `applicationDidFinishLaunching`.
+
+    /// The regression test for that crash: the launch path must offer repair **quietly**.
+    /// `.askNow` is what opens a dialog, and a dialog on this path is what died.
+    func testLaunchOnAnArmedButUnownedMachineNeverAsksToBlock() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false      // somebody has armed this machine
+
+        let effects = machine.handle(.launch)
+
+        XCTAssertEqual(machine.state, .repair)
+        XCTAssertEqual(effects, [.offerRepair(.noLedger, .quietly), .uiNeedsRefresh])
+        for effect in effects {
+            if case .offerRepair(_, let prompt) = effect {
+                XCTAssertEqual(prompt, .quietly,
+                               "the launch path asked to open a dialog; that crashed a real Mac")
+            }
+        }
+    }
+
+    /// Whatever else happens, launching on a machine somebody else armed must not touch it.
+    func testLaunchOnAnArmedButUnownedMachineTouchesNothing() {
+        let (system, ledger, _, watchdog, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false
+
+        machine.handle(.launch)
+
+        XCTAssertTrue(system.clamshellWrites.isEmpty, "wrote to a bit it does not own")
+        XCTAssertTrue(system.assertionWrites.isEmpty, "took an assertion while merely looking")
+        XCTAssertFalse(machine.weSetTheBit, "claimed a bit set by another process")
+        XCTAssertEqual(ledger.writes, 0, "recorded intent for something it did not do")
+        XCTAssertEqual(watchdog.connectAttempts, 0, "started a dead-man for a session it has not")
+    }
+
+    /// And it must not claim to be protecting. The icon and the menu are driven from this.
+    func testAnArmedButUnownedMachineIsNotReportedAsProtected() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false
+
+        machine.handle(.launch)
+
+        XCTAssertFalse(machine.state.isProtecting,
+                       "a machine somebody else armed was reported as protected by us")
+    }
+
+    /// The user asking for something is the one case where a dialog is right - and the ellipsis
+    /// in "Repair Now..." promises one.
+    func testAskingToArmWhileUnownedIsAllowedToOpenADialog() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false
+        machine.handle(.launch)
+
+        let effects = machine.handle(.userArm)
+
+        XCTAssertEqual(effects.first, .offerRepair(.noLedger, .askNow))
+    }
+
+    /// Repair, once the user asks for it, clears a bit this process never set - which is the
+    /// entire point of the separate `repairClamshellState` call.
+    func testRepairClearsABitWeNeverSet() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .repair)
+
+        machine.handle(.repairRequested)
+
+        XCTAssertEqual(system.repairCalls, 1, "repair went through the ordinary write, which "
+                       + "refuses to clear a bit we did not set")
+        XCTAssertEqual(machine.state, .idle)
     }
 
     func testLaunchWithALedgerFromAnotherProcessStandsDown() throws {

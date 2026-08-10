@@ -19,6 +19,9 @@ final class AppCoordinator {
     let preferences = Preferences.shared
     var observers: SystemObservers?
     private var notifyServer: NotifyServer?
+    /// Why the machine looked non-stock at launch, kept so the menu item can explain it when the
+    /// user asks. Set without ever opening a dialog.
+    private(set) var pendingRepairCause: RepairCause?
     /// Set when a coding agent says it is blocked, cleared when the user opens the menu.
     /// Advisory only: invariant I8 means nothing on that socket can arm anything, and this
     /// property is the entire extent of its reach into the app.
@@ -179,8 +182,11 @@ final class AppCoordinator {
         deliver(machine.handle(.userArm))
     }
 
+    /// The menu item. This is a user action, so a confirmation dialog is expected here and is
+    /// the one place it is safe - the menu title ends in an ellipsis precisely because it
+    /// promises one.
     func repairNow() {
-        deliver(machine.handle(.repairRequested))
+        presentRepair(pendingRepairCause ?? .noLedger)
     }
 
     func sleepNow() {
@@ -324,8 +330,22 @@ final class AppCoordinator {
             log.emit(LogCatalogue.armRefused, .power,
                      ["reason": String(describing: refusal)])
             presentRefusal(refusal)
-        case .offerRepair(let cause):
-            presentRepair(cause)
+        case .offerRepair(let cause, let prompt):
+            switch prompt {
+            case .quietly:
+                // Never a modal here. This arrives from `onLaunch`, which runs inside
+                // `applicationDidFinishLaunching`, which is itself inside the Apple Event
+                // handler - and a nested modal run loop there pops an autorelease pool the
+                // launch machinery still owns. That crashed on a user's Mac at 0x94.
+                //
+                // The menu already carries this state in words, with a "Repair Now..." item, and
+                // the glyph already shows it. So the launch path draws the eye and says nothing
+                // it cannot say without blocking.
+                pendingRepairCause = cause
+                return true
+            case .askNow:
+                presentRepair(cause)
+            }
         case .beginActivity:
             beginActivity()
         case .endActivity:

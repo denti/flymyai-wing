@@ -1,6 +1,20 @@
 import Foundation
 
-/// Every user-visible string, in one place, resolved through the bundle's localisations.
+/// Every user-visible string, in one place. **This app is English, everywhere, permanently.**
+///
+/// It used to carry a Russian catalogue selected from `Locale.preferredLanguages`, and that
+/// shipped: `Выключено` and `Не спать` are both in the v0.1.0 binary, so on a Russian-language
+/// Mac the interface really was Russian. `MISSION.md` says English. The substitution hook has
+/// been removed rather than merely left unset - a switch nothing sets today is a switch
+/// somebody sets tomorrow.
+///
+/// Strings that come from **macOS** rather than from here - error descriptions, the buttons in
+/// system-provided dialogs - still appear in the user's own language, and that is not something
+/// this product controls. Where one is shown it is never glued into a sentence of ours; it
+/// appears on its own, as a quoted value.
+///
+/// The key stays as the first argument even though nothing looks it up: it is what
+/// `StringKey.all` is checked against, which keeps these two rules enforceable.
 ///
 /// Two rules that outlive any particular translation:
 ///
@@ -17,17 +31,13 @@ import Foundation
 /// rather than blank.
 public enum Strings {
 
-    /// Overridden by the host so `LidwingCore` needs no `Bundle.module` and stays portable.
-    /// Set once at launch; read-only afterwards.
-    public nonisolated(unsafe) static var localiser: ((_ key: String, _ fallback: String) -> String)?
-
     public static func text(_ key: String, _ english: String) -> String {
-        localiser?(key, english) ?? english
+        english
     }
 
     /// Positional interpolation, so a translation can reorder the arguments.
     public static func text(_ key: String, _ english: String, _ arguments: CVarArg...) -> String {
-        String(format: localiser?(key, english) ?? english, arguments: arguments)
+        String(format: english, arguments: arguments)
     }
 }
 

@@ -40,7 +40,7 @@ extension StateMachine {
         case .repair(let cause):
             state = .repair
             repairCause = cause
-            return [.offerRepair(cause)]
+            return [.offerRepair(cause, .quietly)]
         case .standDown:
             state = .idle
             repairCause = nil
@@ -106,7 +106,7 @@ extension StateMachine {
                 ledgerStore.delete()
             }
         case .repair:
-            return [.offerRepair(repairCause ?? .noLedger)]
+            return [.offerRepair(repairCause ?? .noLedger, .askNow)]
         case .unsupported:
             return [.refuseArm(.unsupportedOS)]
         case .arming, .armed, .degraded, .disarming:

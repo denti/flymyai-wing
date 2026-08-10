@@ -158,6 +158,9 @@ extension AppCoordinator {
         alert.addButton(withTitle: Strings.text("dialog.repair.confirm", "Repair"))
         alert.addButton(withTitle: Strings.text("dialog.repair.decline", "Leave It Alone"))
         _ = cause
+        // `runModal` is safe here and only here: every caller is a user action - the menu item,
+        // or turning Lidwing on while the machine is already non-stock. It is never reached from
+        // the launch path, which is what the `.quietly` prompt exists to guarantee.
         if runModal({ alert }) == .alertFirstButtonReturn {
             deliver(machine.handle(.repairRequested))
         }

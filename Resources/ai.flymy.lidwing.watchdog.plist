@@ -8,8 +8,17 @@
 	<string>Contents/Resources/lidwingd</string>
 	<key>RunAtLoad</key>
 	<true/>
+	<!-- Not `<true/>`. That restarts the watchdog forever, so once the app is gone it stays
+	     resident with nothing to watch - which is exactly what a user saw after the launch
+	     crash: Lidwing dead and lidwingd still running, with no way to tell why.
+	     `SuccessfulExit: false` keeps the part that matters - if the watchdog itself crashes
+	     while it is guarding an armed session, launchd brings it straight back - while letting
+	     it exit for good once its work is done and there is nobody left to protect. -->
 	<key>KeepAlive</key>
-	<true/>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
 	<key>ProcessType</key>
 	<string>Background</string>
 	<key>AssociatedBundleIdentifiers</key>

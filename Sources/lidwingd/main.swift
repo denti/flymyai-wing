@@ -181,6 +181,7 @@ final class Watchdog {
             log("client EOF")
             dropClient()
             apply(WatchdogPolicy.onEOF(observation()))
+            retireIfThereIsNothingLeftToGuard()
             return
         }
         pending.append(contentsOf: buffer[0..<count])
@@ -192,6 +193,29 @@ final class Watchdog {
             pending.removeSubrange(pending.startIndex...newline)
             handle(line: Data(line))
         }
+    }
+
+    /// Exits once the app is gone and the machine is stock again.
+    ///
+    /// A watchdog with no client is not guarding anything, and a process that outlives the app
+    /// it belongs to is exactly what a user sees as "this thing left something running". After
+    /// the launch crash on a real Mac, `lidwingd` was still there afterwards with nothing to do.
+    ///
+    /// It only leaves when the machine is provably back to stock. If ground truth is still
+    /// non-stock the job is unfinished - so it stays, keeps trying, and launchd keeps it alive
+    /// if it dies in the attempt. The plist's `SuccessfulExit: false` is the other half of this:
+    /// a clean exit here means "done", and launchd honours it.
+    private func retireIfThereIsNothingLeftToGuard() {
+        guard clientDescriptor < 0 else { return }
+        // Ground truth, read fresh. `AppleClamshellCausesSleep == false` means somebody still
+        // has this Mac held awake on lid close; `nil` means the key is absent, which is the
+        // ordinary state of a machine where it has never been set.
+        guard RootDomain.clamshellCausesSleep != false else {
+            log("staying: the machine is not stock and there is no client to fix it")
+            return
+        }
+        log("retiring: no client, and the machine is stock")
+        exit(0)
     }
 
     private func handle(line: Data) {

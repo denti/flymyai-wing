@@ -112,6 +112,17 @@ public enum UserNotice: Equatable, Sendable {
 }
 
 /// Everything the state machine wants the host to do that is not a system read or write.
+/// Whether a repair offer may open a dialog.
+///
+/// Not a presentation detail: it is the difference between "the app decided to interrupt you"
+/// and "you asked for this". Only the second may block.
+public enum RepairPrompt: String, Equatable, Sendable {
+    /// Show it in the menu and draw the eye. **Never** a modal. This is what launch emits.
+    case quietly
+    /// The user asked for something that needs a decision, so a dialog is expected and correct.
+    case askNow
+}
+
 public enum LidwingEffect: Equatable, Sendable {
     case startTimer(LidwingTimer)
     case stopTimer(LidwingTimer)
@@ -125,7 +136,19 @@ public enum LidwingEffect: Equatable, Sendable {
     case refuseArm(ArmRefusal)
     /// Ground truth is non-stock and we may have caused it. Offer one-click Repair; never act
     /// silently, because a silent clear can stomp powerd or another tool.
-    case offerRepair(RepairCause)
+    ///
+    /// The `RepairPrompt` is load-bearing and exists because of a real crash. At launch this
+    /// used to be presented as a modal `NSAlert`, run synchronously inside
+    /// `applicationDidFinishLaunching` - which is itself inside the Apple Event handler. The
+    /// nested modal run loop spun while AppKit was still finishing launch and popped an
+    /// autorelease pool the launch machinery still owned: `EXC_BAD_ACCESS` at `0x94` on the main
+    /// thread, on a user's Mac, on first launch.
+    ///
+    /// Worse than the crash is where it happened. This path runs precisely when the machine is
+    /// already in an odd state - a previous instance died, a second copy is running, another
+    /// utility set the same global bit - so it is the one path guaranteed to execute on a Mac
+    /// that already needs help.
+    case offerRepair(RepairCause, RepairPrompt)
     /// Ground truth is non-stock and the ledger says it was not us.
     case showForeignHolder
     /// Hold off App Nap and sudden termination for the armed session.

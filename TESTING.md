@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **244** |
+| Tests | **245** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
