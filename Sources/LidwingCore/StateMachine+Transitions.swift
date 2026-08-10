@@ -159,7 +159,11 @@ extension StateMachine {
     // MARK: Verification of both transitions
 
     func onVerifyTick() -> [LidwingEffect] {
-        guard let started = phaseStartedAt else { return [] }
+        guard let started = phaseStartedAt else {
+            // No deadline means nothing is being verified. Stop rather than leaving a 10 Hz
+            // timer running for the life of the process.
+            return [.stopTimer(.verify)]
+        }
         let elapsed = facade.now.timeIntervalSince(started)
 
         switch state {

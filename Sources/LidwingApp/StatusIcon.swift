@@ -24,7 +24,23 @@ enum StatusIcon {
         case unsupported   // outline wing, dimmed by appearsDisabled
     }
 
+    /// Rendered images, keyed by shape and thickness.
+    ///
+    /// The status item is refreshed on every reconcile tick, and re-rasterising a bezier path
+    /// five times a minute for a picture that has not changed is exactly the kind of idle work
+    /// that shows up in Activity Monitor's Energy tab. There are five shapes and one
+    /// thickness, so the cache is bounded by construction.
+    private static var cache: [String: NSImage] = [:]
+
     static func image(for shape: Shape, thickness: CGFloat) -> NSImage {
+        let key = "\(shape)-\(Int(thickness * 2))"
+        if let cached = cache[key] { return cached }
+        let rendered = render(shape, thickness: thickness)
+        cache[key] = rendered
+        return rendered
+    }
+
+    private static func render(_ shape: Shape, thickness: CGFloat) -> NSImage {
         // The canvas is the status item's own box. Never a hardcoded 22 or 24: the drawable
         // thickness, the menu-bar band and the notch safe area are three different numbers on
         // one machine.

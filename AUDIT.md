@@ -66,3 +66,45 @@ and `docs/human-checklist.md`, and none of them is claimed as done anywhere in t
 **Round 1 verdict:** one critical defect found and fixed, in a tool whose entire purpose is
 safety. Two more that would have made the CI signal meaningless without looking broken. That
 ratio is the argument for doing this again before, not after, the first user.
+
+
+---
+
+## Round 2 — 2026-08-10, against runtime behaviour rather than logic
+
+Round 1 read the code for correctness. This round asked a different question: **what does this
+process actually do, second by second, on a machine that is doing nothing?** An app whose
+promise is "save your battery" that shows up in Activity Monitor's Energy tab has refuted
+itself, and none of the unit tests could have caught any of the following.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 2.1 | The status item was re-rendered on **every** effect delivery, including the five-second reconcile tick — rasterising a bezier path twelve times a minute for a picture that had not changed. | Medium | Refresh only when the presented state actually changes. |
+| 2.2 | `StatusIcon.image` allocated and drew a fresh `NSImage` on every call. | Medium | Cached by shape and thickness. Five shapes, one thickness: bounded by construction. |
+| 2.3 | `UserDefaults` was written on every event, armed or not, because `hasEverArmed` was assigned unconditionally. | Medium | Assign only on change. |
+| 2.4 | `currentPowerSample()` called `PowerSourceReader.read()` three times — `onAC`, `batteryCurrent` and `batteryMax` each copy the entire power-source blob. | Low | One read per pass where the caller needs all three. |
+| 2.5 | The reconcile timer was started at launch with a comment saying "guards run whether or not we are armed", and then stopped permanently by the first disarm. The comment was a lie after the first cycle, and the timer was pointless before it: there is nothing to guard while idle. | Medium | Armed-session scoped, and the comment now says what the code does. An idle Lidwing runs no timer at all. |
+| 2.6 | **A modal dialog spins its own run loop**, so the reconcile timer kept firing underneath one and could put a second dialog on top. The user would have had to dismiss a stack. | Medium | One modal at a time, enforced by a flag on the only path that presents them. |
+| 2.7 | `NSAlert().runModal()` ran before `NSApplication.shared` existed, on the "already running" path. Touching `NSApp` implicitly from a static context is a launch-time crash waiting for the one user who double-clicks twice. | Medium | The application is created first. |
+| 2.8 | `onVerifyTick` returned early when it had no deadline, without stopping the timer. Unreachable today, but the failure mode is a **10 Hz timer running for the life of the process** — the single worst thing this app could do to a battery. | Medium | No deadline stops the timer. |
+
+### Findings, rejected
+
+| Finding | Why |
+|---|---|
+| "Cache `foreignAssertionHolders`; `IOPMCopyAssertionsByProcess` is not free." | It is called when the menu is built, which is when a human is looking, and once per reconcile tick during an armed session. Caching it would mean showing a stale answer to the question *who else is keeping this Mac awake* — which is precisely the question a suspicious user opens the menu to ask. Measure it in `perf-gate.sh` first; optimise only if the number says so. |
+| "Coalesce the reassert and reconcile timers into one." | They have different periods for different reasons: re-assertion is a write that must beat powerd's clearing of the bit, reconciliation is a read that decides whether to end the session. One timer at the faster period would double the wake-ups; one at the slower would weaken the mechanism. |
+| "The 100 ms verify timer is too fast." | It exists for at most two seconds per transition and it is the only thing standing between "the API returned success" and "the machine agrees". Its cost is bounded by construction; the leeway is 20 ms because 2 s is the entire budget it has to work in. |
+
+### Still not measured
+
+Every number in `perf-gate.sh` is a budget, not a measurement: idle CPU, idle wake-ups,
+resident memory, descriptor growth. The script exists and has never been run, because running
+it needs a Mac with the app installed. That is `docs/human-checklist.md`, and until it happens
+this section says **unmeasured** rather than quoting the budgets as if they were results.
+
+**Round 2 verdict:** no correctness defects, eight efficiency and robustness ones, and the two
+that matter most (the never-stopping fast timer, the stacking modals) were reachable only by
+reading the code as a running process rather than as a set of functions.

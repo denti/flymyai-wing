@@ -7,6 +7,11 @@ enum LidwingMain {
     static func main() {
         // Two Lidwings racing to set and clear the same bit is a correctness bug, not a
         // cosmetic one, so the second instance leaves rather than fighting.
+        // NSApplication has to exist before any alert: `runModal` drives `NSApp`, and touching
+        // it implicitly from a static context is a launch-time crash waiting for the one user
+        // who double-clicks twice.
+        let application = NSApplication.shared
+
         guard SingleInstance.acquire() else {
             let alert = NSAlert()
             alert.messageText = "Lidwing is already running"
@@ -15,7 +20,6 @@ enum LidwingMain {
             return
         }
 
-        let application = NSApplication.shared
         let delegate = AppDelegate()
         application.delegate = delegate
         // Belt and braces with LSUIElement in Info.plist. Never `.regular` to show a window:

@@ -76,7 +76,9 @@ final class AppCoordinator {
 
         readWatchdogRecoveryRecord()
         deliver(machine.handle(.launch))
-        startTimer(.reconcile)          // guards run whether or not we are armed
+        // No timer is started here. The guards exist to end an armed session, so they run for
+        // exactly as long as one lasts; the menu computes its own state when it is opened.
+        // An idle Lidwing does no work at all.
     }
 
     func stop() {
@@ -184,10 +186,21 @@ final class AppCoordinator {
                 onStateChange?()
             }
         }
-        preferences.hasEverArmed = machine.hasEverArmed
+        if preferences.hasEverArmed != machine.hasEverArmed {
+            preferences.hasEverArmed = machine.hasEverArmed
+        }
         armedSince = machine.session?.armedAt
-        onStateChange?()
+
+        // Refresh only when the user-visible state actually changed. `deliver` runs on every
+        // reconcile tick, and re-rendering the status item twelve times a minute for a picture
+        // that has not changed is exactly the idle work this app promises not to do.
+        if machine.state != lastPresentedState {
+            lastPresentedState = machine.state
+            onStateChange?()
+        }
     }
+
+    private var lastPresentedState: LidwingState?
 
     // MARK: timers
     //
@@ -328,14 +341,26 @@ final class AppCoordinator {
         }
     }
 
+    /// True while a modal is on screen. A modal runs its own run loop, so the reconcile timer
+    /// keeps firing underneath it — without this, a second dialog can land on top of the first
+    /// and the user has to dismiss a stack.
+    private var isPresentingModal = false
+
+    private func runModal(_ build: () -> NSAlert) -> NSApplication.ModalResponse {
+        guard !isPresentingModal else { return .cancel }
+        isPresentingModal = true
+        defer { isPresentingModal = false }
+        NSApp.activate(ignoringOtherApps: true)
+        return build().runModal()
+    }
+
     private func presentRefusal(_ refusal: ArmRefusal) {
         let alert = NSAlert()
         alert.messageText = "Lidwing did not turn on"
         alert.informativeText = refusal.sentence
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        _ = runModal { alert }
     }
 
     private func presentRepair(_ cause: RepairCause) {
@@ -350,11 +375,10 @@ final class AppCoordinator {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Repair")
         alert.addButton(withTitle: "Leave It Alone")
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
+        _ = cause
+        if runModal({ alert }) == .alertFirstButtonReturn {
             deliver(machine.handle(.repairRequested))
         }
-        _ = cause
     }
 
     /// The watchdog leaves a record on disk when it cleans up after us. Reading it here is how
@@ -371,6 +395,8 @@ final class AppCoordinator {
     // MARK: presentation
 
     func snapshot() -> MenuPresenter.Snapshot {
+        // One read, not three: `onAC`, `batteryCurrent` and `batteryMax` each copy the whole
+        // power-source blob, and the menu needs all three at once.
         let power = PowerSourceReader.read()
         let sample = PowerSample(onAC: power.onAC, current: power.current, max: power.max,
                                  warning: power.warning)
