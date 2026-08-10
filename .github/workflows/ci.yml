@@ -119,6 +119,10 @@ jobs:
       # including a run in which the lid was never closed.
       - name: The M0 verdict logic
         run: ./Scripts/test-m0-verdict.sh
+      # The Mac-only scripts refuse to run here and do not run in CI either, so the logic that
+      # decides whether a run counted would otherwise ship having never executed anywhere.
+      - name: The report floors in the Mac-only scripts
+        run: ./Scripts/test-report-floors.sh
 
   test-macos:
     runs-on: macos-15

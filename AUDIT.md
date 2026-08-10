@@ -600,6 +600,15 @@ guard rather than the sample guard, so deleting the sample guard changed nothing
 see. `expect` now asserts on the reason text as well as the verdict, which is what makes each
 case test its own guard rather than the union of all of them.
 
+### The same hole, two scripts over
+
+`invariants.sh` had a floor added an hour earlier because a run that checks nothing must not
+report success. `fault-injection.sh` and `lidwing-smoke.sh` end in `exit "$FAIL"` and had exactly
+the same hole: stop after two of six scenarios and the output is `SUMMARY pass=2 fail=0` and an
+exit code of zero. Both now carry the floor, and both floors are tested - they refuse to run on
+Linux and do not run in CI, so without `Scripts/test-report-floors.sh` that logic would ship
+having never executed anywhere at all.
+
 **Round 10 verdict:** three defects in one 324-line script, one of them critical, in the
 component with the least code and the most riding on it. It had been reviewed twice before, for
 correctness - which it had. The question that found these was not "is this right" but "can this

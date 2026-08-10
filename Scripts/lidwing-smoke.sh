@@ -34,6 +34,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# The number of assertions a complete run makes, pass, fail or skip. Overridable so the floor
+# itself can be exercised.
+EXPECTED_ASSERTIONS="${EXPECTED_ASSERTIONS:-20}"
+
 ok()   { PASS=$((PASS + 1)); echo "RESULT PASS $1 ${2:-}"; }
 bad()  { FAIL=$((FAIL + 1)); echo "RESULT FAIL $1 ${2:-}"; }
 skip() { SKIP=$((SKIP + 1)); echo "RESULT SKIP $1 ${2:-}"; }
@@ -229,5 +233,13 @@ fi
 echo "SUMMARY pass=$PASS fail=$FAIL skip=$SKIP chassis=$CHASSIS os=$OS_VER arch=$ARCH"
 if [ "$SKIP" -gt 0 ]; then
   echo "NOTE  $SKIP assertion(s) were SKIPPED. A skip is not a pass."
+fi
+
+# The same floor as the other scripts. This one is read-only and runs on machines nobody here
+# can see, so a short run that exits 0 is exactly the result that would be believed.
+RAN=$(( PASS + FAIL + SKIP ))
+if [ "$RAN" -lt "$EXPECTED_ASSERTIONS" ]; then
+  echo "INCOMPLETE: $RAN of $EXPECTED_ASSERTIONS assertions ran - this proved less than it claims"
+  exit 3
 fi
 exit "$FAIL"

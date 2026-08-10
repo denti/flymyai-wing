@@ -30,6 +30,10 @@ if [ ! -x "$BINARY" ]; then
   exit 201
 fi
 
+# How many assertions a complete run makes. The scenarios each have one or two, and F4 reports
+# one of two mutually exclusive outcomes; the number is the floor a finished run must reach.
+EXPECTED_ASSERTIONS="${EXPECTED_ASSERTIONS:-6}"
+
 ok()   { PASS=$((PASS + 1)); echo "RESULT PASS $1 ${2:-}"; }
 bad()  { FAIL=$((FAIL + 1)); echo "RESULT FAIL $1 ${2:-}"; }
 note() { echo "NOTE  $*"; }
@@ -179,4 +183,13 @@ RESIDUE="$(find "$HOME/Library" -iname '*lidwing*' -maxdepth 3 2>/dev/null | gre
 note "residue check: ${RESIDUE:-none beyond the support directory}"
 
 echo "SUMMARY pass=$PASS fail=$FAIL"
+
+# A run that reached the end having checked two things is not a pass with two checks; it is a
+# run that stopped early and reported success. `invariants.sh` had the same hole and this is
+# the same fix: the script knows how many assertions it contains, and says so when fewer ran.
+RAN=$(( PASS + FAIL ))
+if [ "$RAN" -lt "$EXPECTED_ASSERTIONS" ]; then
+  echo "INCOMPLETE: $RAN of $EXPECTED_ASSERTIONS assertions ran - this proved less than it claims"
+  exit 3
+fi
 exit "$FAIL"

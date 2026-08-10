@@ -40,6 +40,7 @@ echo "== core purity"
 ./Scripts/check-bundle-contract.sh || FAIL=1      # prints its own header
 ./Scripts/check-documented-numbers.sh || FAIL=1   # prints its own header
 ./Scripts/test-m0-verdict.sh || FAIL=1            # prints its own header
+./Scripts/test-report-floors.sh || FAIL=1         # prints its own header
 
 echo "== build (warnings are errors)"
 run_swift swift build -Xswiftc -warnings-as-errors || FAIL=1
