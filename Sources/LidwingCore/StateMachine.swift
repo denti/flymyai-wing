@@ -16,7 +16,12 @@ public final class StateMachine {
 
     /// Set by the host from preferences before `launch`, read back after the first arm.
     public var hasEverArmed = false
-    public var mode: LidwingMode = .manual
+    public var mode: LidwingMode = .manual {
+        didSet {
+            guard mode != oldValue else { return }
+            agentGoneSince = nil
+        }
+    }
     public var settings: SafetySettings {
         didSet { policy = SafetyPolicy(settings: settings) }
     }

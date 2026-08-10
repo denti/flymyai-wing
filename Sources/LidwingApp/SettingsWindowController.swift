@@ -19,6 +19,10 @@ final class SettingsWindowController: NSWindowController {
     private let soundCheckbox = NSButton(checkboxWithTitle: "Play a sound when the lid closes",
                                          target: nil, action: nil)
 
+    private let modeControl = NSSegmentedControl(labels: ["Manual", "Auto"],
+                                                 trackingMode: .selectOne,
+                                                 target: nil, action: nil)
+
     private let floorChoices = [10, 15, 20, 30, 50]
     /// nil is "no limit", and it sits last behind a confirmation.
     private let durationChoices: [Int?] = [3600, 2 * 3600, 4 * 3600, 8 * 3600, 12 * 3600,
@@ -66,6 +70,15 @@ final class SettingsWindowController: NSWindowController {
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
+        stack.addArrangedSubview(sectionHeader("When to keep this Mac awake"))
+        modeControl.target = self
+        modeControl.action = #selector(modeChanged)
+        stack.addArrangedSubview(withExplanation(
+            modeControl,
+            "Auto turns Lidwing on by itself while claude, codex or cursor-agent is running, "
+            + "and off again a few minutes after the last one exits."))
+
+        stack.addArrangedSubview(separator())
         stack.addArrangedSubview(sectionHeader("It stops on its own"))
 
         for choice in floorChoices { floorPopUp.addItem(withTitle: "\(choice)%") }
@@ -102,36 +115,7 @@ final class SettingsWindowController: NSWindowController {
             "You can't see the screen with the lid closed, so Lidwing says it out loud."))
 
         stack.addArrangedSubview(separator())
-        stack.addArrangedSubview(sectionHeader("Coding agents"))
-
-        let agentsNote = NSTextField(labelWithString:
-            "Lidwing can make a sound when your agent is waiting for you, so you hear it with "
-            + "the lid closed. It shows you every line before it writes one.")
-        agentsNote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        agentsNote.textColor = .secondaryLabelColor
-        agentsNote.lineBreakMode = .byWordWrapping
-        agentsNote.preferredMaxLayoutWidth = 400
-        stack.addArrangedSubview(agentsNote)
-
-        for agent in IntegrationInstaller.Agent.allCases {
-            let present = IntegrationInstaller.isPresent(agent)
-            let label = NSTextField(labelWithString:
-                present ? "\(agent.displayName) - found at ~/\(agent.relativePath)"
-                        : "\(agent.displayName) - not installed")
-            let add = NSButton(title: "Show What Will Be Written\u{2026}",
-                               target: self, action: #selector(addIntegration(_:)))
-            add.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
-            add.isEnabled = present
-            let remove = NSButton(title: "Remove", target: self,
-                                  action: #selector(removeIntegration(_:)))
-            remove.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
-            remove.isEnabled = present
-            let row = NSStackView(views: [label, add, remove])
-            row.orientation = .horizontal
-            row.spacing = 8
-            stack.addArrangedSubview(row)
-        }
-
+        for view in agentsSection() { stack.addArrangedSubview(view) }
         stack.addArrangedSubview(separator())
 
         let warning = NSTextField(labelWithString:
@@ -149,6 +133,41 @@ final class SettingsWindowController: NSWindowController {
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor)
         ])
         window.contentView = content
+    }
+
+    /// Every integration is off by default, and the only button that writes anything is
+    /// labelled with what it will show you first.
+    private func agentsSection() -> [NSView] {
+        var views: [NSView] = [sectionHeader("Coding agents")]
+
+        let note = NSTextField(labelWithString:
+            "Lidwing can make a sound when your agent is waiting for you, so you hear it with "
+            + "the lid closed. It shows you every line before it writes one.")
+        note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        note.textColor = .secondaryLabelColor
+        note.lineBreakMode = .byWordWrapping
+        note.preferredMaxLayoutWidth = 480
+        views.append(note)
+
+        for agent in IntegrationInstaller.Agent.allCases {
+            let present = IntegrationInstaller.isPresent(agent)
+            let label = NSTextField(labelWithString:
+                present ? "\(agent.displayName) - found at ~/\(agent.relativePath)"
+                        : "\(agent.displayName) - not installed")
+            let add = NSButton(title: "Show What Will Be Written\u{2026}",
+                               target: self, action: #selector(addIntegration(_:)))
+            add.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
+            add.isEnabled = present
+            let remove = NSButton(title: "Remove", target: self,
+                                  action: #selector(removeIntegration(_:)))
+            remove.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
+            remove.isEnabled = present
+            let row = NSStackView(views: [label, add, remove])
+            row.orientation = .horizontal
+            row.spacing = 8
+            views.append(row)
+        }
+        return views
     }
 
     private func sectionHeader(_ text: String) -> NSTextField {
@@ -202,8 +221,13 @@ final class SettingsWindowController: NSWindowController {
         floorPopUp.selectItem(at: floorChoices.firstIndex(of: settings.batteryFloorPercent) ?? 2)
         let durationIndex = durationChoices.firstIndex { $0 == settings.maxDurationSeconds }
         durationPopUp.selectItem(at: durationIndex ?? 3)
+        modeControl.selectedSegment = coordinator.machine.mode == .auto ? 1 : 0
         thermalCheckbox.state = settings.thermalGuardEnabled ? .on : .off
         soundCheckbox.state = Preferences.shared.soundEnabled ? .on : .off
+    }
+
+    @objc private func modeChanged() {
+        coordinator.setMode(modeControl.selectedSegment == 1 ? .auto : .manual)
     }
 
     @objc private func addIntegration(_ sender: NSButton) {

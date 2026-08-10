@@ -65,6 +65,10 @@ public enum LidwingTimer: String, Equatable, Sendable {
     case verify
     case reassert
     case reconcile
+    /// Only runs in Auto mode. There is no notification for a command-line process starting,
+    /// so this is the one place a poll is unavoidable — and it is the one place the user has
+    /// explicitly asked for it by choosing Auto.
+    case agentPoll
 }
 
 /// Sound is a courtesy channel for the moment the screen is not one.

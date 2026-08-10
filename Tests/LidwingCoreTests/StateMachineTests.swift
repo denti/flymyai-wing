@@ -542,3 +542,90 @@ struct SplitMix64 {
         return z ^ (z >> 31)
     }
 }
+
+/// Auto mode. The user's mental model is "stay awake while my agent is running", not "stay
+/// awake until I remember to turn it off" — and a session that ends by itself cannot be
+/// forgotten, which independently mitigates the battery, thermal and orphan-state problems.
+final class AutoModeTests: XCTestCase {
+
+    private func autoHarness() -> (MockSystem, StateMachine) {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.mode = .auto
+        return (system, machine)
+    }
+
+    func testAnAgentAppearingArms() {
+        let (system, machine) = autoHarness()
+        machine.handle(.launch)
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+        XCTAssertEqual(machine.state, .arming)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+    }
+
+    func testAnAgentAppearingInManualModeDoesNothing() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.mode = .manual
+        machine.handle(.launch)
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+        XCTAssertEqual(machine.state, .idle)
+        XCTAssertTrue(system.clamshellWrites.isEmpty)
+    }
+
+    /// The grace period exists because agents restart. Standing down the instant one exits
+    /// would end the session between two steps of the same run.
+    func testTheGracePeriodIsHonoured() {
+        let (system, machine) = autoHarness()
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+
+        system.runningAgentBinaries = []
+        machine.handle(.agentDisappeared)
+        machine.handle(.reconcileTick)
+        XCTAssertEqual(machine.state, .armed, "we stood down before the grace period elapsed")
+
+        system.advance(400)
+        machine.handle(.reconcileTick)
+        XCTAssertEqual(machine.state, .disarming)
+        system.clamshellCausesSleep = true
+        let effects = machine.handle(.verifyTick)
+        XCTAssertTrue(effects.contains(.notify(.autoDisarmed(.agentExited))))
+    }
+
+    func testAnAgentComingBackDuringTheGracePeriodKeepsTheSessionAlive() {
+        let (system, machine) = autoHarness()
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+        machine.handle(.verifyTick)
+
+        system.runningAgentBinaries = []
+        machine.handle(.agentDisappeared)
+        system.advance(120)
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+
+        system.advance(400)
+        machine.handle(.reconcileTick)
+        XCTAssertEqual(machine.state, .armed, "a restarted agent ended the session anyway")
+    }
+
+    func testSwitchingModesClearsAPendingStandDown() {
+        let (system, machine) = autoHarness()
+        system.runningAgentBinaries = ["claude"]
+        machine.handle(.agentAppeared)
+        machine.handle(.verifyTick)
+
+        system.runningAgentBinaries = []
+        machine.handle(.agentDisappeared)
+        machine.mode = .manual
+        machine.mode = .auto
+        system.advance(400)
+        machine.handle(.reconcileTick)
+        XCTAssertEqual(machine.state, .armed,
+                       "a stale grace-period clock survived a mode change")
+    }
+}

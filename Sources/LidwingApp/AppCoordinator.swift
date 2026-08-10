@@ -26,6 +26,8 @@ final class AppCoordinator {
     private var verifyTimer: DispatchSourceTimer?
     private var reassertTimer: DispatchSourceTimer?
     private var reconcileTimer: DispatchSourceTimer?
+    private var agentPollTimer: DispatchSourceTimer?
+    private var lastSeenAgents: Set<String> = []
     private var activity: NSObjectProtocol?
 
     private(set) var lastFailureAt: Date?
@@ -89,6 +91,7 @@ final class AppCoordinator {
 
         readWatchdogRecoveryRecord()
         deliver(machine.handle(.launch))
+        if machine.mode == .auto { startTimer(.agentPoll) }
         // No timer is started here. The guards exist to end an armed session, so they run for
         // exactly as long as one lasts; the menu computes its own state when it is opened.
         // An idle Lidwing does no work at all.
@@ -103,6 +106,7 @@ final class AppCoordinator {
         stopTimer(.verify)
         stopTimer(.reassert)
         stopTimer(.reconcile)
+        stopTimer(.agentPoll)
         system.closeUserClient()
     }
 
@@ -136,6 +140,37 @@ final class AppCoordinator {
         observers?.stop()
         observers = nil
         system.closeUserClient()
+    }
+
+    /// Auto mode: arm while a watched coding agent is running, stand down after it exits.
+    ///
+    /// The user's mental model is "stay awake while my agent is running", not "stay awake
+    /// until I remember to turn it off" — and the natural disarm independently mitigates the
+    /// battery, thermal and orphan-state problems, because a session that ends by itself
+    /// cannot be forgotten.
+    func setMode(_ mode: LidwingMode) {
+        preferences.mode = mode
+        machine.mode = mode
+        if mode == .auto {
+            startTimer(.agentPoll)
+            pollForAgents()
+        } else {
+            stopTimer(.agentPoll)
+            lastSeenAgents = []
+        }
+        onStateChange?()
+    }
+
+    private func pollForAgents() {
+        let running = system.runningAgentBinaries
+        defer { lastSeenAgents = running }
+        guard running != lastSeenAgents else { return }
+        if !running.isEmpty && lastSeenAgents.isEmpty {
+            deliver(machine.handle(.agentAppeared))
+        } else if running.isEmpty && !lastSeenAgents.isEmpty {
+            deliver(machine.handle(.agentDisappeared))
+        }
+        onStateChange?()
     }
 
     func soundEnabledChanged() {
@@ -269,6 +304,13 @@ final class AppCoordinator {
                 self?.deliver(self?.machine.handle(.reconcileTick) ?? [])
             }
             reconcileTimer = timer
+        case .agentPoll:
+            // Fifteen seconds with two of leeway. A GUI app would get a launch notification;
+            // `claude` and `codex` are command-line processes and there is no such thing for
+            // them, so this is the one unavoidable poll in the product.
+            timer.schedule(deadline: .now() + 2, repeating: 15, leeway: .seconds(2))
+            timer.setEventHandler { [weak self] in self?.pollForAgents() }
+            agentPollTimer = timer
         }
         timer.resume()
     }
@@ -278,6 +320,7 @@ final class AppCoordinator {
         case .verify: verifyTimer?.cancel(); verifyTimer = nil
         case .reassert: reassertTimer?.cancel(); reassertTimer = nil
         case .reconcile: reconcileTimer?.cancel(); reconcileTimer = nil
+        case .agentPoll: agentPollTimer?.cancel(); agentPollTimer = nil
         }
     }
 
