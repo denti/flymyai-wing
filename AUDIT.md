@@ -217,3 +217,47 @@ which is exactly how 4.1 happened.
 
 **Round 4 verdict:** one high-severity defect, in the uninstall path, found by asking what an
 old feature assumed about a new one rather than by reading either of them.
+
+
+---
+
+## Round 5 — 2026-08-10, running the binaries and walking the worst path
+
+Two methods this round. First: compile and **execute** the one component whose contract is
+timing rather than behaviour. Second: walk the sequence a user meets after the worst thing this
+product can do, one state at a time, and ask what they can see at each step.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 5.1 | **`lidwing-notify` read stdin non-blockingly.** Claude Code writes the payload to a pipe and the helper can start first, so the read returned `EAGAIN` and the body was **silently lost** — every notification would have arrived empty, looking as though the agent had nothing to say. | **High** | `select` with the same 100 ms budget: the hard bound on how long we can cost the user's agent is unchanged, and the data actually arrives. |
+| 5.2 | **The menu forgot that the Mac had slept.** After a `SLEPT_WHILE_ARMED` failure the app re-arms itself, and the header went back to a plain "Awake — you can close the lid". Both known holes in the mechanism have the same precondition — the machine must sleep once first — so the first sleep is the single most important thing about that session, and it vanished from the only persistent surface the product has. | **High** | An armed session with any observed sleep shows `Your Mac slept at 03:12` with `Protection is back on. See Diagnostics.`, and keeps the checkmark, because both facts are true at once. |
+| 5.3 | A translocated app would have refused to arm with *"Lidwing could not start its safety watchdog"* — true, and useless: the fix is to drag the app out of Downloads and nothing in that sentence says so. | Medium | Checked before the state machine sees the request, with the specific message. |
+
+### The positive control that had to be built first
+
+The first version of the notify-helper test could not tell the fixed and broken implementations
+apart, because on this machine the shell happened to write to the pipe before the child ran.
+The test passed either way, which makes it worthless as evidence.
+
+Delaying the write by 50 ms makes the race deterministic, and only then is it a real control:
+
+```
+with select():        ok    a payload written 50ms late still arrives      pass=15 fail=0
+with non-blocking:    FAIL  lost a payload ... {"v":1,"src":"claude","body":""}   pass=14 fail=1
+```
+
+That is worth naming as a general rule: **a test that passes against the bug it was written for
+is not a test.** Where timing is the defect, the test has to control the timing.
+
+### Findings, rejected
+
+| Finding | Why |
+|---|---|
+| "After re-arming, clear the failure once the session has been clean for an hour." | No. The audit record for the session already says a sleep happened, and the menu should agree with it. A UI that quietly forgets a failure is how a user concludes the product is fine when it is not. It clears when the session ends, which is the honest boundary. |
+| "Require `/Applications`, as the design document says." | That is a hard requirement for a **daemon** that must run before login. This is a user agent, and `~/Applications` is an ordinary place to keep an app. Refusing to work there would be enforcing somebody else's rule on ourselves. Translocation and `~/Downloads` are refused, because those genuinely break a launchd path. |
+
+**Round 5 verdict:** two high-severity defects, and neither was reachable by reading. One needed
+the binary run with controlled timing; the other needed walking a five-step sequence and asking
+what the user can see at step four.

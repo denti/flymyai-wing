@@ -57,6 +57,8 @@ public enum Translations {
         "menu.arming.detail": "Lidwing не скажет «включено», пока Mac не подтвердит.",
         "menu.disarming": "Возвращаю настройку сна\u{2026}",
         "menu.failed": "Mac уснул в %1$@, несмотря на защиту",
+        "menu.slept": "Mac уснул в %1$@",
+        "menu.slept.detail": "Защита снова включена. Подробности в диагностике.",
         "menu.failed.noTime": "Lidwing не смог защитить этот Mac",
         "menu.failed.detail": "Откройте диагностику. Защита не работает.",
         "menu.foreign": "Другое приложение не даёт этому Mac уснуть",

@@ -28,11 +28,14 @@ public struct MenuPresenter {
         public let lastFailureAt: Date?
         public let foreignHolder: ForeignHolder?
         public let agentRunning: String?
+        /// How many times this Mac has slept during the current armed session. Any number
+        /// above zero is a hard failure that stays visible even after a successful re-arm.
+        public let sleepsObserved: Int
 
         public init(state: LidwingState, armedSince: Date?, now: Date, batteryPercent: Int?,
                     onAC: Bool, thermal: ThermalState, floorPercent: Int,
                     remainingSeconds: Int?, lastFailureAt: Date?, foreignHolder: ForeignHolder?,
-                    agentRunning: String?) {
+                    agentRunning: String?, sleepsObserved: Int = 0) {
             self.state = state
             self.armedSince = armedSince
             self.now = now
@@ -44,6 +47,7 @@ public struct MenuPresenter {
             self.lastFailureAt = lastFailureAt
             self.foreignHolder = foreignHolder
             self.agentRunning = agentRunning
+            self.sleepsObserved = sleepsObserved
         }
     }
 
@@ -109,8 +113,26 @@ public struct MenuPresenter {
         }
     }
 
+    /// A sleep that already happened does not stop being true because we recovered from it.
+    ///
+    /// Both known holes in the mechanism have the same precondition — the machine must have
+    /// slept at least once — so the first sleep is the one that opens the door for the rest.
+    /// Showing a plain "Awake" after re-arming would tell the user the run is fine when the
+    /// most important thing about it is that it is not.
+    private static func recoveredHeadline(_ snapshot: Snapshot) -> Content? {
+        guard snapshot.sleepsObserved > 0, let at = snapshot.lastFailureAt else { return nil }
+        return Content(headline: Strings.text("menu.slept", "Your Mac slept at %1$@", clock(at)),
+                       detail: Strings.text("menu.slept.detail",
+                                            "Protection is back on. See Diagnostics."),
+                       toggleTitle: Strings.text("menu.toggle",
+                                                 "Keep Awake with the Lid Closed"),
+                       toggleChecked: true, toggleEnabled: true,
+                       accessibilityValue: "On, but this Mac slept once despite protection")
+    }
+
     /// The armed and degraded states, which differ only in what they have to warn about.
     private static func protecting(_ snapshot: Snapshot, toggleTitle: String) -> Content {
+        if let recovered = recoveredHeadline(snapshot) { return recovered }
         var headline = Strings.text("menu.awake", "Awake - you can close the lid")
         if let agent = snapshot.agentRunning {
             headline = Strings.text("menu.awake.agent", "Awake - %1$@ is running", agent)

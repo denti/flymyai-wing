@@ -111,3 +111,40 @@ final class MenuPresenterTests: XCTestCase {
         XCTAssertEqual(MenuPresenter.spokenDuration(30), "less than a minute")
     }
 }
+
+/// After the worst thing this product can do happens — the Mac sleeping while armed — it
+/// re-arms itself. These tests are about what the user sees afterwards, because a plain
+/// "Awake" would tell them the run is fine when the most important fact about it is that it
+/// is not.
+final class RecoveredFailureTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_786_500_000)
+
+    private func snapshot(state: LidwingState, sleeps: Int) -> MenuPresenter.Snapshot {
+        MenuPresenter.Snapshot(state: state, armedSince: now.addingTimeInterval(-3600), now: now,
+                               batteryPercent: 61, onAC: false, thermal: .nominal,
+                               floorPercent: 20, remainingSeconds: nil,
+                               lastFailureAt: now.addingTimeInterval(-1800),
+                               foreignHolder: nil, agentRunning: nil, sleepsObserved: sleeps)
+    }
+
+    func testASleepStaysVisibleAfterASuccessfulReArm() {
+        let content = MenuPresenter.content(for: snapshot(state: .armed, sleeps: 1))
+        XCTAssertTrue(content.headline.contains("slept"),
+                      "the menu forgot the Mac slept: \(content.headline)")
+        XCTAssertTrue(content.toggleChecked, "we are protecting again, and the checkmark says so")
+        XCTAssertTrue(content.accessibilityValue.contains("slept"))
+    }
+
+    func testACleanSessionSaysNothingAboutSleeping() {
+        let content = MenuPresenter.content(for: snapshot(state: .armed, sleeps: 0))
+        XCTAssertFalse(content.headline.contains("slept"), content.headline)
+        XCTAssertEqual(content.headline, "Awake - you can close the lid")
+    }
+
+    func testItSurvivesTheDegradedStateToo() {
+        // A hot Mac that also slept has two things wrong with it, and the sleep is the one
+        // that means the mechanism did not hold.
+        let content = MenuPresenter.content(for: snapshot(state: .degraded, sleeps: 2))
+        XCTAssertTrue(content.headline.contains("slept"), content.headline)
+    }
+}

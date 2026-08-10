@@ -187,7 +187,8 @@ extension AppCoordinator {
             remainingSeconds: remaining,
             lastFailureAt: lastFailureAt,
             foreignHolder: system.foreignAssertionHolders.first,
-            agentRunning: system.runningAgentBinaries.sorted().first)
+            agentRunning: system.runningAgentBinaries.sorted().first,
+            sleepsObserved: machine.session?.sleepFailureCount ?? 0)
     }
 
     func diagnosticsText() -> String {
