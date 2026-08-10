@@ -144,6 +144,9 @@ public final class StateMachine {
             lidWasClosed = (lid == .closed)
             return onReassertTrigger(lidJustClosed: justClosed)
 
+        case .lidDeterminedAbsent:
+            return onLidDeterminedAbsent()
+
         case .clamshellNotification, .displayReconfigured, .powerSourceChanged, .reassertTick:
             return onReassertTrigger()
 

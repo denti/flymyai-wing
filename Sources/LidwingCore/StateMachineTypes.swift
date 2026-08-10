@@ -50,6 +50,11 @@ public enum LidwingEvent: Equatable, Sendable {
     case systemWillSleep(argument: UInt)
     case systemHasPoweredOn
     case clamshellNotification
+    /// The lid never reported. `AppleClamshellState` is absent on a laptop until the lid
+    /// driver's first report, so "absent" alone is not evidence — but absent *and still silent
+    /// after a grace period* is. Sent once, by the host, and reversible if a notification
+    /// arrives later.
+    case lidDeterminedAbsent
     /// 10 s: re-issue the write, because powerd and the dark-wake path can clear it.
     case reassertTick
     /// 5 s: evaluate every guard and compare ground truth against intent.

@@ -98,6 +98,16 @@ final class AppCoordinator {
 
         readWatchdogRecoveryRecord()
         deliver(machine.handle(.launch))
+
+        // `AppleClamshellState` is absent on a laptop until the lid driver's first report, so
+        // an absent key at launch is not evidence of a desktop — coercing it would disable the
+        // product at every login. Absent *and still silent after ten seconds* is evidence.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self, !self.system.sawClamshellNotification,
+                  self.system.lidStateRaw == nil else { return }
+            self.system.sawClamshellNotification = true      // makes lidState report .noLid
+            self.deliver(self.machine.handle(.lidDeterminedAbsent))
+        }
         log.emit(LogCatalogue.launch, .lifecycle, [
             "version": version, "build": build,
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
@@ -221,7 +231,12 @@ final class AppCoordinator {
     private func handle(_ signal: SystemSignal) {
         switch signal {
         case .clamshell(let closed, _):
+            // A notification after the grace period means the lid exists after all: a slow
+            // driver, or hardware that reports late. The conclusion is reversible.
             system.sawClamshellNotification = true
+            if machine.state == .unsupported, system.lidStateRaw != nil {
+                deliver(machine.handle(.launch))
+            }
             if let closed {
                 deliver(machine.handle(.lidChanged(closed ? .closed : .open)))
             } else {

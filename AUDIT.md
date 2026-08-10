@@ -261,3 +261,48 @@ is not a test.** Where timing is the defect, the test has to control the timing.
 **Round 5 verdict:** two high-severity defects, and neither was reachable by reading. One needed
 the binary run with controlled timing; the other needed walking a five-step sequence and asking
 what the user can see at step four.
+
+
+---
+
+## Round 6 — 2026-08-10, reading the transition table against the specification
+
+Method: read `StateMachine+Transitions.swift` line by line with `DESIGN.md` §3.3 and §4g open
+beside it, and check each state the specification names against the code that is supposed to
+reach it.
+
+### The finding
+
+**On a Mac with no lid, Lidwing would have offered to protect it.**
+
+`RootDomain.lidState` returns `.unknown` when `AppleClamshellState` is absent and no clamshell
+notification has been seen — which is correct, and deliberately so: the key is absent on a
+*laptop* too until the lid driver makes its first report, and coercing that to "no lid" would
+disable the product at every login. The specification is explicit about it.
+
+What was missing is the other half: **nothing ever concluded the absence.** On a Mac mini no
+clamshell notification ever arrives, so `sawClamshellNotification` stayed false forever,
+`lidState` stayed `.unknown` forever, and `.unknown` is not `.noLid` — so the refusal check
+never fired. The user could turn Lidwing on and read *"Awake — you can close the lid"* on a
+machine with no lid to close.
+
+Not dangerous: the clamshell mask does nothing on a desktop and the idle assertion is harmless.
+But it is the product lying about the one thing it does, and `DESIGN.md` A8.3 asks for the
+opposite — the feature **hidden**, not merely disabled.
+
+Fixed with the ten-second grace period the specification names: absent *and still silent after
+ten seconds* is evidence, and the conclusion is **reversible** — a clamshell notification
+arriving later (a slow driver, unusual hardware) puts the machine back into the ordinary flow.
+Four tests, including one asserting the probe can never end a session that is already
+protecting.
+
+### Findings, rejected
+
+| Finding | Why |
+|---|---|
+| "Conclude no-lid immediately when the key is absent at launch." | This is the mistake the specification warns about by name. The key is absent on a laptop until the lid driver reports, and a Lidwing that disables itself at every login is worse than one that waits ten seconds. |
+| "Probe by arming and seeing what happens." | Never. The runtime probe reads; it does not write. Arming to find out whether arming works is exactly the class of thing this product refuses to do to somebody's machine. |
+
+**Round 6 verdict:** one medium defect, found by reading the code against the specification
+rather than against itself. The specification described a state — *no lid* — that the code had
+a name for and no path to.

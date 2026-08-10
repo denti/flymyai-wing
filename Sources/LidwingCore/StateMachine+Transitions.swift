@@ -59,6 +59,23 @@ extension StateMachine {
         return [.chime(.failure), .notify(.releaseFailed)]
     }
 
+    /// The lid never reported within the grace period, so this Mac does not have one.
+    ///
+    /// On a desktop the clamshell mask is meaningless: there is no lid to close and nothing to
+    /// prevent. Staying in `idle` would let the user turn Lidwing on and would show them a
+    /// confident "Awake - you can close the lid" on a machine with no lid to close, which is
+    /// the product lying about the one thing it does.
+    ///
+    /// Deliberately reversible: if a clamshell notification arrives afterwards — a slow lid
+    /// driver, a hardware quirk — the next arm request finds a real lid and proceeds.
+    func onLidDeterminedAbsent() -> [LidwingEffect] {
+        // Never while protecting. If we somehow got here armed, the lid evidently exists.
+        guard state == .idle || state == .repair else { return [] }
+        guard facade.lidState == .noLid else { return [] }
+        state = .unsupported
+        return []
+    }
+
     // MARK: Arming
 
     func onUserArm() -> [LidwingEffect] {

@@ -656,3 +656,55 @@ final class AutoModeTests: XCTestCase {
                        "a stale grace-period clock survived a mode change")
     }
 }
+
+/// A Mac with no lid. The clamshell mask is meaningless there — there is nothing to close —
+/// and showing "Awake, you can close the lid" on a Mac mini would be the product lying about
+/// the one thing it does.
+final class NoLidTests: XCTestCase {
+
+    func testAnAbsentKeyAtLaunchIsNotYetEvidence() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        // A laptop reports nothing until the lid driver's first report. Concluding "no lid"
+        // here would disable the product at every login.
+        system.lidState = .unknown
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .idle, "we gave up on a lid that had not reported yet")
+    }
+
+    func testSilenceAfterTheGracePeriodIsEvidence() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.lidState = .unknown
+        machine.handle(.launch)
+
+        system.lidState = .noLid            // the host concluded it after ten silent seconds
+        machine.handle(.lidDeterminedAbsent)
+        XCTAssertEqual(machine.state, .unsupported)
+        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.unsupportedOS)])
+    }
+
+    func testTheConclusionIsReversible() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.lidState = .noLid
+        machine.handle(.lidDeterminedAbsent)
+        XCTAssertEqual(machine.state, .unsupported)
+
+        // A slow lid driver reported late. The machine has a lid after all.
+        system.lidState = .open
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .idle)
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+    }
+
+    func testWeNeverConcludeNoLidWhileProtecting() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+
+        system.lidState = .noLid
+        machine.handle(.lidDeterminedAbsent)
+        XCTAssertEqual(machine.state, .armed, "a protected session was ended by a probe")
+    }
+}
