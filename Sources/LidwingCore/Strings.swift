@@ -287,6 +287,22 @@ public enum StringKey {
          + "was.", "%1$@ is a path."),
         StringEntry("integration.nothing.title", "Nothing to remove", ""),
         StringEntry("integration.nothing.body",
-         "Lidwing had not written anything to ~/%1$@.", "%1$@ is a path.")
+         "Lidwing had not written anything to ~/%1$@.", "%1$@ is a path."),
+
+        // Refusal and repair dialogs.
+        StringEntry("dialog.didNotTurnOn.title", "Lidwing did not turn on",
+         "Title above one of the refusal sentences, which says specifically why."),
+        StringEntry("dialog.repair.title",
+         "This Mac is set not to sleep when you close the lid", ""),
+        StringEntry("dialog.repair.body",
+         "Lidwing did not set this in the session that is running now, so it will not change "
+         + "anything without asking. This is usually left over from a previous run.", ""),
+        StringEntry("dialog.repair.body2",
+         "Repair puts the setting back the way macOS ships it.", ""),
+        StringEntry("dialog.repair.confirm", "Repair", ""),
+        StringEntry("dialog.repair.decline", "Leave It Alone",
+         "Never a bare Cancel here: declining is a real choice with a real consequence."),
+        StringEntry("dialog.alreadyRunning.title", "Lidwing is already running", ""),
+        StringEntry("dialog.alreadyRunning.body", "Look for the wing in your menu bar.", "")
     ]
 }

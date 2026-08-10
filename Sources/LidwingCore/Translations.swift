@@ -212,6 +212,16 @@ public enum Translations {
         "integration.removed.body": "Записи Lidwing больше нет в ~/%1$@. Всё остальное в файле "
             + "осталось ровно как было.",
         "integration.nothing.title": "Убирать нечего",
-        "integration.nothing.body": "Lidwing ничего не писал в ~/%1$@."
+        "integration.nothing.body": "Lidwing ничего не писал в ~/%1$@.",
+
+        "dialog.didNotTurnOn.title": "Lidwing не включился",
+        "dialog.repair.title": "Этот Mac настроен не засыпать при закрытии крышки",
+        "dialog.repair.body": "Lidwing не выставлял это в текущем сеансе, поэтому ничего не "
+            + "меняет без вашего согласия. Обычно так остаётся после прошлого запуска.",
+        "dialog.repair.body2": "«Исправить» вернёт настройку к той, что macOS ставит по умолчанию.",
+        "dialog.repair.confirm": "Исправить",
+        "dialog.repair.decline": "Не трогать",
+        "dialog.alreadyRunning.title": "Lidwing уже работает",
+        "dialog.alreadyRunning.body": "Ищите крыло в строке меню."
     ]
 }

@@ -128,25 +128,27 @@ extension AppCoordinator {
 
     func presentRefusal(_ refusal: ArmRefusal) {
         let alert = NSAlert()
-        alert.messageText = "Lidwing did not turn on"
+        alert.messageText = Strings.text("dialog.didNotTurnOn.title", "Lidwing did not turn on")
         alert.informativeText = refusal.sentence
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: Strings.text("button.ok", "OK"))
         _ = runModal { alert }
     }
 
     func presentRepair(_ cause: RepairCause) {
         let alert = NSAlert()
-        alert.messageText = "This Mac is set not to sleep when you close the lid"
-        alert.informativeText = """
-        Lidwing did not set this in the session that is running now, so it will not change \
-        anything without asking. This is usually left over from a previous run.
-
-        Repair puts the setting back the way macOS ships it.
-        """
+        alert.messageText = Strings.text("dialog.repair.title",
+                                         "This Mac is set not to sleep when you close the lid")
+        alert.informativeText = Strings.text(
+            "dialog.repair.body",
+            "Lidwing did not set this in the session that is running now, so it will not change "
+            + "anything without asking. This is usually left over from a previous run.")
+            + "\n\n"
+            + Strings.text("dialog.repair.body2",
+                           "Repair puts the setting back the way macOS ships it.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Repair")
-        alert.addButton(withTitle: "Leave It Alone")
+        alert.addButton(withTitle: Strings.text("dialog.repair.confirm", "Repair"))
+        alert.addButton(withTitle: Strings.text("dialog.repair.decline", "Leave It Alone"))
         _ = cause
         if runModal({ alert }) == .alertFirstButtonReturn {
             deliver(machine.handle(.repairRequested))

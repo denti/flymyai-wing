@@ -14,8 +14,11 @@ enum LidwingMain {
 
         guard SingleInstance.acquire() else {
             let alert = NSAlert()
-            alert.messageText = "Lidwing is already running"
-            alert.informativeText = "Look for the wing in your menu bar."
+            Strings.localiser = Translations.localiser(for: Locale.preferredLanguages)
+            alert.messageText = Strings.text("dialog.alreadyRunning.title",
+                                             "Lidwing is already running")
+            alert.informativeText = Strings.text("dialog.alreadyRunning.body",
+                                                 "Look for the wing in your menu bar.")
             alert.runModal()
             return
         }
