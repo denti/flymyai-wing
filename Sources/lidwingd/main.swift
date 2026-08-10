@@ -19,11 +19,8 @@ import Darwin
 import LidwingCore
 import LidwingSystem
 
-/// Seconds of silence from a connected app before we assume it is wedged.
-let heartbeatDeadline: TimeInterval = 15
-/// At RunAtLoad, how long we wait for the app to reconnect before treating a stale marker as
-/// evidence that it died.
-let orphanGrace: TimeInterval = 10
+// Every decision this process makes lives in `WatchdogPolicy`, in the portable module, where
+// it is unit-tested. What is left here is sockets, IOKit and files.
 
 let socketPath = SupportDirectory.file(LidwingID.controlSocketName).path
 let markerPath = SupportDirectory.file("armed.json").path
@@ -69,34 +66,54 @@ final class Watchdog {
 
     // MARK: recovery
 
-    /// Clear the bit, but only under the same rule the app itself obeys.
-    ///
-    /// Invariant I7: bit 0x02 is shared with powerd and carries no reference count. Clearing it
-    /// where powerd legitimately wants it set — an external display on AC — would sleep
-    /// somebody else's lid-closed machine mid-operation. An unconditional clear here would be
-    /// the watchdog causing exactly the class of harm it exists to prevent.
-    func recover(reason: String) {
-        guard isWatching else { return }
-        let onAC = PowerSourceReader.read().onAC
-        let desktop = RootDomain.desktopMode
-        log("recovering (\(reason)); desktopMode=\(desktop) onAC=\(onAC)")
+    /// What the watchdog currently knows, in the shape the policy takes.
+    func observation() -> WatchdogPolicy.Observation {
+        WatchdogPolicy.Observation(isWatching: isWatching,
+                                   hasClient: clientDescriptor >= 0,
+                                   lastHeartbeat: lastHeartbeat,
+                                   now: Date(),
+                                   desktopMode: RootDomain.desktopMode,
+                                   onAC: PowerSourceReader.read().onAC)
+    }
 
-        if desktop && onAC {
-            log("standing down: powerd legitimately owns the clamshell state in this configuration")
-        } else if lock.open() {
-            let result = lock.set(false)
-            log("cleared clamshell bit, kr=0x\(String(UInt32(bitPattern: result), radix: 16))")
-            let after = RootDomain.clamshellCausesSleep
-            log("AppleClamshellCausesSleep after clear: \(after.map(String.init(describing:)) ?? "absent")")
-        } else {
-            log("FAILED to open IOPMrootDomain user client; cannot clear")
+    /// Carries out whatever the policy decided. The decision itself is not made here.
+    func apply(_ action: WatchdogPolicy.Action) {
+        switch action {
+        case .idle:
+            return
+
+        case .deleteStaleMarker:
+            log("stale marker from a previous boot; the mask self-cleared, deleting")
+            clearMarker()
+            armedBootSession = nil
+            appPID = nil
+
+        case .standDown(let trigger):
+            // Invariant I7: powerd legitimately owns the clamshell state in this
+            // configuration, and clearing it would sleep somebody else's lid-closed machine.
+            log("standing down (\(trigger.rawValue)): powerd owns the clamshell state here")
+            writeRecoveredRecord(reason: "stood_down_" + trigger.rawValue)
+            armedBootSession = nil
+            appPID = nil
+            clearMarker()
+
+        case .recover(let trigger):
+            log("recovering (\(trigger.rawValue))")
+            if lock.open() {
+                let result = lock.set(false)
+                log("cleared clamshell bit, kr=0x\(String(UInt32(bitPattern: result), radix: 16))")
+                let after = RootDomain.clamshellCausesSleep
+                log("AppleClamshellCausesSleep after clear: "
+                    + (after.map(String.init(describing:)) ?? "absent"))
+            } else {
+                log("FAILED to open IOPMrootDomain user client; cannot clear")
+            }
+            writeRecoveredRecord(reason: trigger.rawValue)
+            notifyUser()
+            armedBootSession = nil
+            appPID = nil
+            clearMarker()
         }
-
-        writeRecoveredRecord(reason: reason)
-        notifyUser()
-        armedBootSession = nil
-        appPID = nil
-        clearMarker()
     }
 
     /// The app reads this at its next launch and tells the user exactly what happened and
@@ -163,7 +180,7 @@ final class Watchdog {
             // EOF. This is the primary signal, and it is the reason the app is the client.
             log("client EOF")
             dropClient()
-            if isWatching { recover(reason: "app_died") }
+            apply(WatchdogPolicy.onEOF(observation()))
             return
         }
         pending.append(contentsOf: buffer[0..<count])
@@ -207,16 +224,9 @@ final class Watchdog {
     // MARK: the slow check
 
     func tick() {
-        guard isWatching else { return }
-        if clientDescriptor < 0 {
-            recover(reason: "no_client")
-            return
-        }
-        if Date().timeIntervalSince(lastHeartbeat) > heartbeatDeadline {
-            log("heartbeat deadline exceeded")
-            dropClient()
-            recover(reason: "heartbeat_lost")
-        }
+        let action = WatchdogPolicy.tick(observation())
+        if case .recover(.heartbeatLost) = action { dropClient() }
+        apply(action)
     }
 
     /// RunAtLoad path: a marker from *this* boot with no app connecting means the app died and
@@ -224,19 +234,22 @@ final class Watchdog {
     /// and harmless — the kernel initialises the mask to zero at boot — so it is deleted, not
     /// acted on.
     func reconcileAtStartup() {
-        guard let marker = Watchdog.readMarker() else { return }
-        let currentBoot = RootDomain.bootSessionUUID
-        guard marker.boot == currentBoot else {
-            log("stale marker from a previous boot; the mask self-cleared, deleting")
-            clearMarker()
+        let marker = Watchdog.readMarker()
+        let action = WatchdogPolicy.atStartup(markerBootSession: marker?.boot,
+                                              currentBootSession: RootDomain.bootSessionUUID)
+        guard let marker else { return }
+        if case .deleteStaleMarker = action {
+            armedBootSession = marker.boot
+            apply(action)
             return
         }
-        log("marker from this boot found (pid \(marker.pid)); waiting \(Int(orphanGrace))s for the app")
+        let grace = Int(WatchdogPolicy.orphanGrace)
+        log("marker from this boot (pid \(marker.pid)); waiting \(grace)s for the app")
         armedBootSession = marker.boot
         appPID = marker.pid
-        DispatchQueue.main.asyncAfter(deadline: .now() + orphanGrace) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + WatchdogPolicy.orphanGrace) { [weak self] in
             guard let self, self.isWatching, self.clientDescriptor < 0 else { return }
-            self.recover(reason: "orphan_at_startup")
+            self.apply(WatchdogPolicy.onEOF(self.observation()))
         }
     }
 }
@@ -287,7 +300,9 @@ for sig in [SIGTERM, SIGINT] {
     let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
     source.setEventHandler {
         log("signal \(sig)")
-        watchdog.recover(reason: "watchdog_terminating")
+        // If we are still watching at this point, the app is not going to get another chance
+        // to clean up after itself.
+        watchdog.apply(WatchdogPolicy.onEOF(watchdog.observation()))
         exit(0)
     }
     source.resume()

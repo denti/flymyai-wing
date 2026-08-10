@@ -114,6 +114,39 @@ engineering one.
 
 ---
 
+## H3b — Fault injection · 10 minutes · once the app is installed
+
+The unit tests cover the *logic* of dying mid-transition. This covers the *processes*.
+
+```bash
+cd ~/lidwing-repo
+./Scripts/fault-injection.sh /Applications/Lidwing.app
+```
+
+It will ask you twice to turn Lidwing on from the menu and press Return — arming is a
+deliberate user action and there is deliberately no way to do it from a script.
+
+**Expected:**
+
+```
+RESULT PASS f1.crash-safe  the watchdog restored lid-close sleep after SIGKILL
+RESULT PASS f2.recovery-record  recovered.json written: {...}
+RESULT PASS f3.survives-corrupt-ledger  the app launched and is running
+RESULT PASS f3.no-silent-change  a corrupt ledger changed nothing on the machine
+RESULT PASS f4.stands-down  ...   (or f4.watchdog-relaunched)
+RESULT PASS f5.stock  AppleClamshellCausesSleep is back to Yes
+SUMMARY pass=6 fail=0
+```
+
+**`f1.crash-safe` is the one that matters.** It is the assertion standing between a user and a
+laptop that cannot sleep in a backpack. If it fails, stop and send me the output before doing
+anything else.
+
+The script refuses to start on a machine whose baseline is already non-stock, because a dirty
+baseline produces a fake pass.
+
+---
+
 ## H4 — Apple Developer Program enrolment · **has multi-week lead time, so start early**
 
 $99/year. Not needed for M0 or for any development, and needed for everything a stranger can
