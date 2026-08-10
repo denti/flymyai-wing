@@ -167,6 +167,119 @@ public enum StringKey {
         StringEntry("agent.generic", "Your coding agent",
          "Used when the hook did not say which tool it came from."),
         StringEntry("agent.waiting.body", "It needs an answer before it can carry on.",
-         "Shown when the agent sent no message of its own.")
+         "Shown when the agent sent no message of its own."),
+
+        // Settings. Every row is a label, a control and a sentence saying what the choice
+        // costs; a checkbox whose consequence is unstated is one nobody can decide about.
+        StringEntry("settings.title", "Lidwing Settings",
+         "Window title. Apple's rule: 'App Name Settings' for a single-pane window."),
+        StringEntry("settings.when", "When to keep this Mac awake", "Section header."),
+        StringEntry("settings.mode.manual", "Manual", "Segmented control label."),
+        StringEntry("settings.mode.auto", "Auto", "Segmented control label."),
+        StringEntry("settings.mode.detail",
+         "Auto turns Lidwing on by itself while claude, codex or cursor-agent is running, "
+         + "and off again a few minutes after the last one exits.", ""),
+        StringEntry("settings.limits", "It stops on its own", "Section header. The trust screen."),
+        StringEntry("settings.floor", "Stop when the battery reaches", ""),
+        StringEntry("settings.floor.detail",
+         "Your Mac goes to sleep instead of running the battery flat.", ""),
+        StringEntry("settings.duration", "Stop after", ""),
+        StringEntry("settings.duration.detail",
+         "Lidwing turns itself off after this long, even if you forget.", ""),
+        StringEntry("settings.duration.hours", "%1$lld hours",
+         "%1$lld is a whole number of hours."),
+        StringEntry("settings.duration.none", "No limit",
+         "The one choice that removes a safety net, so the one choice that asks."),
+        StringEntry("settings.thermal", "Stop if the Mac gets too hot", ""),
+        StringEntry("settings.thermal.detail",
+         "A closed lid blocks airflow. Lidwing stops before your Mac overheats.", ""),
+        StringEntry("settings.sound", "Sound", "Section header."),
+        StringEntry("settings.sound.lidClose", "Play a sound when the lid closes", ""),
+        StringEntry("settings.sound.detail",
+         "You can't see the screen with the lid closed, so Lidwing says it out loud.", ""),
+        StringEntry("settings.agents", "Coding agents", "Section header."),
+        StringEntry("settings.agents.detail",
+         "Lidwing can make a sound when your agent is waiting for you, so you hear it with "
+         + "the lid closed. It shows you every line before it writes one.", ""),
+        StringEntry("settings.agents.found", "%1$@ - found at ~/%2$@",
+         "%1$@ is a tool name such as Claude Code, %2$@ a path such as .claude/settings.json."),
+        StringEntry("settings.agents.missing", "%1$@ - not installed",
+         "%1$@ is a tool name."),
+        StringEntry("settings.agents.show", "Show What Will Be Written\u{2026}",
+         "The only button that leads to a write, named for what it does first."),
+        StringEntry("settings.agents.remove", "Remove", ""),
+        StringEntry("settings.bagWarning",
+         "\u{26A0}\u{FE0E} Don't put your Mac in a bag while Lidwing is on.", ""),
+        StringEntry("settings.noLimit.title", "Run with no time limit?", ""),
+        StringEntry("settings.noLimit.body",
+         "The battery and heat limits still apply, so Lidwing will still stop before your Mac "
+         + "runs flat or gets too hot. But it will not stop just because time passed, and a "
+         + "forgotten Lidwing is how a laptop ends up warm in a bag.", ""),
+        StringEntry("settings.noLimit.confirm", "Remove the Time Limit", ""),
+
+        // Buttons that appear in more than one dialog.
+        StringEntry("button.ok", "OK", ""),
+        StringEntry("button.cancel", "Cancel", ""),
+
+        // Uninstall. An app that can stop a Mac sleeping and cannot remove itself is
+        // indistinguishable from malware, so this path is as carefully worded as the install.
+        StringEntry("uninstall.confirm.title", "Remove Lidwing from this Mac?", ""),
+        StringEntry("uninstall.confirm.action", "Remove Lidwing", ""),
+        StringEntry("uninstall.willDo", "Lidwing will:", ""),
+        StringEntry("uninstall.willDelete", "Files it will delete:", ""),
+        StringEntry("uninstall.noSettings",
+         "It changes no system settings on the way out: Lidwing never wrote one.", ""),
+        StringEntry("uninstall.checkWith", "You can check afterwards with:", ""),
+        StringEntry("uninstall.step.disarm",
+         "Let your Mac sleep on lid close again, and check that it did.", ""),
+        StringEntry("uninstall.step.integrations",
+         "Remove its entries from any coding-agent config it wrote.", ""),
+        StringEntry("uninstall.step.restore", "Put back anything it displaced, exactly.", ""),
+        StringEntry("uninstall.step.watchdog", "Stop and remove its background helper.", ""),
+        StringEntry("uninstall.step.files", "Delete its own files.", ""),
+        StringEntry("uninstall.step.verify", "Check that nothing of Lidwing is left.", ""),
+        StringEntry("uninstall.step.reveal",
+         "Show you Lidwing in Finder so you can drag it to the Trash.", ""),
+        StringEntry("uninstall.done.title", "Lidwing removed", ""),
+        StringEntry("uninstall.done.body", "Drag Lidwing to the Trash to finish.", ""),
+        StringEntry("uninstall.failed.title", "Lidwing was not fully removed", ""),
+        StringEntry("uninstall.failed.body",
+         "If your Mac still will not sleep when you close the lid, restarting it clears the "
+         + "setting: Lidwing never writes anything that survives a restart.", ""),
+
+        // Integrations.
+        StringEntry("integration.absent.title", "%1$@ is not installed here",
+         "%1$@ is a tool name such as Codex."),
+        StringEntry("integration.absent.body",
+         "Lidwing looked for ~/%1$@ and did not find it. It never creates a configuration "
+         + "file for a tool you do not have.", "%1$@ is a path such as .codex/config.toml."),
+        StringEntry("integration.unreadable.title", "Lidwing will not change %1$@'s settings",
+         "%1$@ is a tool name."),
+        StringEntry("integration.unreadable.body",
+         "It could not read ~/%1$@ well enough to be sure it would change only its own line, "
+         + "so it changed nothing at all.", "%1$@ is a path."),
+        StringEntry("integration.already.title", "Already set up", ""),
+        StringEntry("integration.already.body",
+         "%1$@ already runs Lidwing's notifier. Nothing to do.", "%1$@ is a tool name."),
+        StringEntry("integration.offer.title", "Add Lidwing to %1$@?", "%1$@ is a tool name."),
+        StringEntry("integration.offer.body",
+         "Lidwing will change exactly these lines in ~/%1$@, and keep a dated backup of the "
+         + "file beside it.", "%1$@ is a path."),
+        StringEntry("integration.offer.chaining",
+         "%1$@ already runs something here. Lidwing will chain to it rather than replace it, "
+         + "so it keeps working:", "%1$@ is a tool name."),
+        StringEntry("integration.offer.confirm", "Write These Lines", ""),
+        StringEntry("integration.done.title", "Done", ""),
+        StringEntry("integration.done.body",
+         "%1$@ will tell Lidwing when it needs you, and Lidwing will make a sound so you hear "
+         + "it with the lid closed.", "%1$@ is a tool name."),
+        StringEntry("integration.writeFailed.title", "Lidwing could not write the file", ""),
+        StringEntry("integration.removed.title", "Removed", ""),
+        StringEntry("integration.removed.body",
+         "Lidwing's entry is gone from ~/%1$@. Everything else in the file is exactly as it "
+         + "was.", "%1$@ is a path."),
+        StringEntry("integration.nothing.title", "Nothing to remove", ""),
+        StringEntry("integration.nothing.body",
+         "Lidwing had not written anything to ~/%1$@.", "%1$@ is a path.")
     ]
 }

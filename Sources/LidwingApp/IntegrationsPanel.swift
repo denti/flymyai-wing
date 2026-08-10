@@ -20,9 +20,12 @@ enum IntegrationsPanel {
     @discardableResult
     static func offerInstall(_ agent: IntegrationInstaller.Agent) -> Bool {
         guard IntegrationInstaller.isPresent(agent) else {
-            inform(title: "\(agent.displayName) is not installed here",
-                   body: "Lidwing looked for ~/\(agent.relativePath) and did not find it. It "
-                       + "never creates a configuration file for a tool you do not have.")
+            inform(title: Strings.text("integration.absent.title", "%1$@ is not installed here",
+                                       agent.displayName),
+                   body: Strings.text("integration.absent.body",
+                                      "Lidwing looked for ~/%1$@ and did not find it. It never "
+                                      + "creates a configuration file for a tool you do not have.",
+                                      agent.relativePath))
             return false
         }
 
@@ -31,45 +34,57 @@ enum IntegrationsPanel {
             preview = try IntegrationInstaller.previewInstall(agent, helperPath: helperPath())
         } catch {
             // A file we could not parse is a file we do not write to. Ever.
-            inform(title: "Lidwing will not change \(agent.displayName)'s settings",
-                   body: "It could not read ~/\(agent.relativePath) well enough to be sure it "
-                       + "would change only its own line, so it changed nothing at all.\n\n"
-                       + "\(error)")
+            inform(title: Strings.text("integration.unreadable.title",
+                                       "Lidwing will not change %1$@'s settings",
+                                       agent.displayName),
+                   body: Strings.text("integration.unreadable.body",
+                                      "It could not read ~/%1$@ well enough to be sure it would "
+                                      + "change only its own line, so it changed nothing at all.",
+                                      agent.relativePath) + "\n\n\(error)")
             return false
         }
 
         guard preview.willChange else {
-            inform(title: "Already set up",
-                   body: "\(agent.displayName) already runs Lidwing's notifier. Nothing to do.")
+            inform(title: Strings.text("integration.already.title", "Already set up"),
+                   body: Strings.text("integration.already.body",
+                                      "%1$@ already runs Lidwing's notifier. Nothing to do.",
+                                      agent.displayName))
             return true
         }
 
         let alert = NSAlert()
-        alert.messageText = "Add Lidwing to \(agent.displayName)?"
-        var body = ["Lidwing will change exactly these lines in ~/\(agent.relativePath), and "
-                    + "keep a dated backup of the file beside it.", ""]
+        alert.messageText = Strings.text("integration.offer.title", "Add Lidwing to %1$@?",
+                                         agent.displayName)
+        var body = [Strings.text("integration.offer.body",
+                                 "Lidwing will change exactly these lines in ~/%1$@, and keep a "
+                                 + "dated backup of the file beside it.", agent.relativePath), ""]
         if let displaced = preview.displaced, !displaced.isEmpty {
-            body.append("\(agent.displayName) already runs something here. Lidwing will chain "
-                        + "to it rather than replace it, so it keeps working:")
+            body.append(Strings.text("integration.offer.chaining",
+                                     "%1$@ already runs something here. Lidwing will chain to it "
+                                     + "rather than replace it, so it keeps working:",
+                                     agent.displayName))
             body.append("  " + displaced.joined(separator: " "))
             body.append("")
         }
         body.append(preview.diff)
         alert.informativeText = body.joined(separator: "\n")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Write These Lines")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: Strings.text("integration.offer.confirm", "Write These Lines"))
+        alert.addButton(withTitle: Strings.text("button.cancel", "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return false }
 
         do {
             try IntegrationInstaller.install(agent, helperPath: helperPath())
-            inform(title: "Done",
-                   body: "\(agent.displayName) will tell Lidwing when it needs you, and Lidwing "
-                       + "will make a sound so you hear it with the lid closed.")
+            inform(title: Strings.text("integration.done.title", "Done"),
+                   body: Strings.text("integration.done.body",
+                                      "%1$@ will tell Lidwing when it needs you, and Lidwing will "
+                                      + "make a sound so you hear it with the lid closed.",
+                                      agent.displayName))
             return true
         } catch {
-            inform(title: "Lidwing could not write the file", body: "\(error)")
+            inform(title: Strings.text("integration.writeFailed.title",
+                                       "Lidwing could not write the file"), body: "\(error)")
             return false
         }
     }
@@ -78,14 +93,19 @@ enum IntegrationsPanel {
     static func remove(_ agent: IntegrationInstaller.Agent) -> Bool {
         do {
             let removed = try IntegrationInstaller.uninstall(agent)
-            inform(title: removed ? "Removed" : "Nothing to remove",
+            inform(title: removed ? Strings.text("integration.removed.title", "Removed")
+                                  : Strings.text("integration.nothing.title", "Nothing to remove"),
                    body: removed
-                       ? "Lidwing's entry is gone from ~/\(agent.relativePath). Everything else "
-                         + "in the file is exactly as it was."
-                       : "Lidwing had not written anything to ~/\(agent.relativePath).")
+                       ? Strings.text("integration.removed.body",
+                                      "Lidwing's entry is gone from ~/%1$@. Everything else in "
+                                      + "the file is exactly as it was.", agent.relativePath)
+                       : Strings.text("integration.nothing.body",
+                                      "Lidwing had not written anything to ~/%1$@.",
+                                      agent.relativePath))
             return removed
         } catch {
-            inform(title: "Lidwing could not change the file", body: "\(error)")
+            inform(title: Strings.text("integration.writeFailed.title",
+                                       "Lidwing could not write the file"), body: "\(error)")
             return false
         }
     }
@@ -95,7 +115,7 @@ enum IntegrationsPanel {
         alert.messageText = title
         alert.informativeText = body
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: Strings.text("button.ok", "OK"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }

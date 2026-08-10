@@ -85,32 +85,47 @@ enum Uninstaller {
 
     /// Shown before anything is removed. Every absolute path, in the order they will go.
     static func confirmationText() -> String {
-        var lines = ["Lidwing will:", ""]
+        var lines = [Strings.text("uninstall.willDo", "Lidwing will:"), ""]
         for (index, step) in UninstallPlan.steps.enumerated() {
             lines.append("\(index + 1). \(describe(step))")
         }
         lines.append("")
-        lines.append("Files it will delete:")
+        lines.append(Strings.text("uninstall.willDelete", "Files it will delete:"))
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         for relative in UninstallSurface.homeRelativePaths {
             lines.append("  \(home)/\(relative)")
         }
         lines.append("")
-        lines.append("It changes no system settings on the way out: Lidwing never wrote one.")
-        lines.append("You can check afterwards with:")
+        lines.append(Strings.text("uninstall.noSettings",
+                                  "It changes no system settings on the way out: "
+                                  + "Lidwing never wrote one."))
+        lines.append(Strings.text("uninstall.checkWith", "You can check afterwards with:"))
         lines.append("  \(UninstallSurface.verificationCommand)")
         return lines.joined(separator: "\n")
     }
 
     private static func describe(_ step: UninstallPlan.Step) -> String {
         switch step {
-        case .disarmAndVerify: return "Let your Mac sleep on lid close again, and check that it did."
-        case .removeIntegrations: return "Remove its entries from any coding-agent config it wrote."
-        case .restoreDisplacedConfiguration: return "Put back anything it displaced, exactly."
-        case .removeWatchdog: return "Stop and remove its background helper."
-        case .removeSupportDirectory: return "Delete its own files."
-        case .verifyStock: return "Check that nothing of Lidwing is left."
-        case .revealApp: return "Show you Lidwing in Finder so you can drag it to the Trash."
+        case .disarmAndVerify:
+            return Strings.text("uninstall.step.disarm",
+                                "Let your Mac sleep on lid close again, and check that it did.")
+        case .removeIntegrations:
+            return Strings.text("uninstall.step.integrations",
+                                "Remove its entries from any coding-agent config it wrote.")
+        case .restoreDisplacedConfiguration:
+            return Strings.text("uninstall.step.restore",
+                                "Put back anything it displaced, exactly.")
+        case .removeWatchdog:
+            return Strings.text("uninstall.step.watchdog",
+                                "Stop and remove its background helper.")
+        case .removeSupportDirectory:
+            return Strings.text("uninstall.step.files", "Delete its own files.")
+        case .verifyStock:
+            return Strings.text("uninstall.step.verify",
+                                "Check that nothing of Lidwing is left.")
+        case .revealApp:
+            return Strings.text("uninstall.step.reveal",
+                                "Show you Lidwing in Finder so you can drag it to the Trash.")
         }
     }
 }

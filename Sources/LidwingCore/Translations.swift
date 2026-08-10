@@ -125,6 +125,89 @@ public enum Translations {
             + "Откройте его, чтобы посмотреть детали.",
 
         "agent.generic": "Ваш агент",
-        "agent.waiting.body": "Ему нужен ответ, чтобы продолжить."
+        "agent.waiting.body": "Ему нужен ответ, чтобы продолжить.",
+
+        "settings.title": "Настройки Lidwing",
+        "settings.when": "Когда не давать Mac уснуть",
+        "settings.mode.manual": "Вручную",
+        "settings.mode.auto": "Автоматически",
+        "settings.mode.detail": "В автоматическом режиме Lidwing включается сам, пока работает "
+            + "claude, codex или cursor-agent, и выключается через несколько минут после того, "
+            + "как последний из них завершится.",
+        "settings.limits": "Выключится сам",
+        "settings.floor": "Выключиться, когда батарея дойдёт до",
+        "settings.floor.detail": "Mac уснёт, а не разрядится в ноль.",
+        "settings.duration": "Выключиться через",
+        "settings.duration.detail": "Lidwing выключится сам через это время, даже если вы забудете.",
+        "settings.duration.hours": "%1$lld ч",
+        "settings.duration.none": "Без ограничения",
+        "settings.thermal": "Выключиться, если Mac перегреется",
+        "settings.thermal.detail": "Закрытая крышка мешает продуву. "
+            + "Lidwing выключится до перегрева.",
+        "settings.sound": "Звук",
+        "settings.sound.lidClose": "Звук при закрытии крышки",
+        "settings.sound.detail": "С закрытой крышкой экрана не видно, поэтому Lidwing "
+            + "говорит об этом вслух.",
+        "settings.agents": "Кодинг-агенты",
+        "settings.agents.detail": "Lidwing может подать звук, когда агент ждёт вашего ответа - "
+            + "чтобы вы услышали это с закрытой крышкой. Перед записью он покажет каждую строку.",
+        "settings.agents.found": "%1$@ - найден в ~/%2$@",
+        "settings.agents.missing": "%1$@ - не установлен",
+        "settings.agents.show": "Показать, что будет записано\u{2026}",
+        "settings.agents.remove": "Убрать",
+        "settings.bagWarning": "\u{26A0}\u{FE0E} Не убирайте Mac в сумку, пока Lidwing включён.",
+        "settings.noLimit.title": "Работать без ограничения по времени?",
+        "settings.noLimit.body": "Ограничения по батарее и температуре останутся, так что "
+            + "Lidwing всё равно выключится до разряда и до перегрева. Но он не выключится "
+            + "просто потому, что прошло время, а забытый Lidwing - это как раз тот случай, "
+            + "когда ноутбук нагревается в сумке.",
+        "settings.noLimit.confirm": "Убрать ограничение",
+
+        "button.ok": "ОК",
+        "button.cancel": "Отмена",
+
+        "uninstall.confirm.title": "Удалить Lidwing с этого Mac?",
+        "uninstall.confirm.action": "Удалить Lidwing",
+        "uninstall.willDo": "Lidwing сделает следующее:",
+        "uninstall.willDelete": "Файлы, которые он удалит:",
+        "uninstall.noSettings": "Системные настройки он не трогает: Lidwing ничего в них "
+            + "и не писал.",
+        "uninstall.checkWith": "Проверить после удаления можно так:",
+        "uninstall.step.disarm": "Вернуть сон по закрытию крышки и убедиться, что он вернулся.",
+        "uninstall.step.integrations": "Убрать свои записи из конфигов кодинг-агентов.",
+        "uninstall.step.restore": "Вернуть в точности то, что он заменил.",
+        "uninstall.step.watchdog": "Остановить и удалить фоновый процесс.",
+        "uninstall.step.files": "Удалить свои файлы.",
+        "uninstall.step.verify": "Проверить, что от Lidwing ничего не осталось.",
+        "uninstall.step.reveal": "Показать Lidwing в Finder, чтобы вы перетащили его в Корзину.",
+        "uninstall.done.title": "Lidwing удалён",
+        "uninstall.done.body": "Перетащите Lidwing в Корзину, чтобы закончить.",
+        "uninstall.failed.title": "Lidwing удалён не полностью",
+        "uninstall.failed.body": "Если Mac по-прежнему не засыпает при закрытии крышки, "
+            + "перезагрузите его: Lidwing не пишет ничего, что переживает перезагрузку.",
+
+        "integration.absent.title": "%1$@ здесь не установлен",
+        "integration.absent.body": "Lidwing искал ~/%1$@ и не нашёл. Он никогда не создаёт "
+            + "файл настроек для инструмента, которого у вас нет.",
+        "integration.unreadable.title": "Lidwing не станет менять настройки %1$@",
+        "integration.unreadable.body": "Не удалось прочитать ~/%1$@ достаточно уверенно, чтобы "
+            + "изменить только свою строку, поэтому он не изменил ничего.",
+        "integration.already.title": "Уже настроено",
+        "integration.already.body": "%1$@ уже запускает уведомитель Lidwing. Делать нечего.",
+        "integration.offer.title": "Добавить Lidwing в %1$@?",
+        "integration.offer.body": "Lidwing изменит ровно эти строки в ~/%1$@ и оставит рядом "
+            + "копию файла с датой.",
+        "integration.offer.chaining": "%1$@ уже что-то здесь запускает. Lidwing вызовет это "
+            + "следом, а не заменит собой, так что оно продолжит работать:",
+        "integration.offer.confirm": "Записать эти строки",
+        "integration.done.title": "Готово",
+        "integration.done.body": "%1$@ сообщит Lidwing, когда вы понадобитесь, а Lidwing подаст "
+            + "звук, чтобы вы услышали это с закрытой крышкой.",
+        "integration.writeFailed.title": "Lidwing не смог записать файл",
+        "integration.removed.title": "Убрано",
+        "integration.removed.body": "Записи Lidwing больше нет в ~/%1$@. Всё остальное в файле "
+            + "осталось ровно как было.",
+        "integration.nothing.title": "Убирать нечего",
+        "integration.nothing.body": "Lidwing ничего не писал в ~/%1$@."
     ]
 }

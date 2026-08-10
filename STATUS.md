@@ -83,6 +83,7 @@ Nothing is idling on any of these.
 | [0006](docs/decisions/0006-repository-visibility-and-readme.md) | Private vs measured public | Public; one-line README until release |
 | [0007](docs/decisions/0007-name-availability-check.md) | T5 name check | Clear everywhere reachable |
 | [0008](docs/decisions/0008-when-lidwing-makes-a-sound.md) | Chime on arm vs on lid close | Lid close, and standing down with the lid shut |
+| [0009](docs/decisions/0009-localisation-scope.md) | Eight languages vs what can be checked | English and Russian, complete and tested; diagnostics stay English on purpose |
 
 ## Audit — three rounds, all findings fixed
 

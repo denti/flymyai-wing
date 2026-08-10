@@ -223,7 +223,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         alert.messageText = "Diagnostics copied"
         alert.informativeText = text
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: Strings.text("button.ok", "OK"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
@@ -232,24 +232,28 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// indistinguishable from malware. The removal path is in the menu, not in a document.
     @objc private func uninstall() {
         let confirm = NSAlert()
-        confirm.messageText = "Remove Lidwing from this Mac?"
+        confirm.messageText = Strings.text("uninstall.confirm.title",
+                                           "Remove Lidwing from this Mac?")
         confirm.informativeText = Uninstaller.confirmationText()
         confirm.alertStyle = .warning
-        confirm.addButton(withTitle: "Remove Lidwing")
-        confirm.addButton(withTitle: "Cancel")
+        confirm.addButton(withTitle: Strings.text("uninstall.confirm.action", "Remove Lidwing"))
+        confirm.addButton(withTitle: Strings.text("button.cancel", "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
         let outcome = Uninstaller.run(coordinator: coordinator)
         let report = NSAlert()
-        report.messageText = outcome.succeeded ? "Lidwing removed" : "Lidwing was not fully removed"
-        report.informativeText = outcome.lines.joined(separator: "\n")
-            + (outcome.succeeded
-               ? "\n\nDrag Lidwing to the Trash to finish."
-               : "\n\nIf your Mac still will not sleep when you close the lid, restarting it "
-                 + "clears the setting: Lidwing never writes anything that survives a restart.")
+        report.messageText = outcome.succeeded
+            ? Strings.text("uninstall.done.title", "Lidwing removed")
+            : Strings.text("uninstall.failed.title", "Lidwing was not fully removed")
+        report.informativeText = outcome.lines.joined(separator: "\n") + "\n\n" + (outcome.succeeded
+            ? Strings.text("uninstall.done.body", "Drag Lidwing to the Trash to finish.")
+            : Strings.text("uninstall.failed.body",
+                           "If your Mac still will not sleep when you close the lid, restarting "
+                           + "it clears the setting: Lidwing never writes anything that survives "
+                           + "a restart."))
         report.alertStyle = outcome.succeeded ? .informational : .critical
-        report.addButton(withTitle: "OK")
+        report.addButton(withTitle: Strings.text("button.ok", "OK"))
         report.runModal()
         if outcome.succeeded { NSApp.terminate(nil) }
     }

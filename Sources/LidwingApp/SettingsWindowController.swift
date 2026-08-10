@@ -14,12 +14,15 @@ final class SettingsWindowController: NSWindowController {
     // because a settings window with no controls is not a state this class can be in.
     private let floorPopUp = NSPopUpButton()
     private let durationPopUp = NSPopUpButton()
-    private let thermalCheckbox = NSButton(checkboxWithTitle: "Stop if the Mac gets too hot",
+    private let thermalCheckbox = NSButton(checkboxWithTitle: Strings.text("settings.thermal",
+                                                                    "Stop if the Mac gets too hot"),
                                            target: nil, action: nil)
-    private let soundCheckbox = NSButton(checkboxWithTitle: "Play a sound when the lid closes",
+    private let soundCheckbox = NSButton(checkboxWithTitle: Strings.text("settings.sound.lidClose",
+                                                                  "Play a sound when the lid closes"),
                                          target: nil, action: nil)
 
-    private let modeControl = NSSegmentedControl(labels: ["Manual", "Auto"],
+    private let modeControl = NSSegmentedControl(labels: [Strings.text("settings.mode.manual", "Manual"),
+                                                          Strings.text("settings.mode.auto", "Auto")],
                                                  trackingMode: .selectOne,
                                                  target: nil, action: nil)
 
@@ -33,7 +36,7 @@ final class SettingsWindowController: NSWindowController {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
                               styleMask: [.titled, .closable],
                               backing: .buffered, defer: false)
-        window.title = "Lidwing Settings"
+        window.title = Strings.text("settings.title", "Lidwing Settings")
         super.init(window: window)
         window.setFrameAutosaveName("LidwingSettings")
         // A settings window that can be zoomed or minimised out of reach helps nobody, but the
@@ -70,56 +73,68 @@ final class SettingsWindowController: NSWindowController {
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        stack.addArrangedSubview(sectionHeader("When to keep this Mac awake"))
+        stack.addArrangedSubview(sectionHeader(Strings.text("settings.when",
+                                                            "When to keep this Mac awake")))
         modeControl.target = self
         modeControl.action = #selector(modeChanged)
         stack.addArrangedSubview(withExplanation(
             modeControl,
-            "Auto turns Lidwing on by itself while claude, codex or cursor-agent is running, "
-            + "and off again a few minutes after the last one exits."))
+            Strings.text("settings.mode.detail",
+                         "Auto turns Lidwing on by itself while claude, codex or cursor-agent "
+                         + "is running, and off again a few minutes after the last one exits.")))
 
         stack.addArrangedSubview(separator())
-        stack.addArrangedSubview(sectionHeader("It stops on its own"))
+        stack.addArrangedSubview(sectionHeader(Strings.text("settings.limits",
+                                                            "It stops on its own")))
 
         for choice in floorChoices { floorPopUp.addItem(withTitle: "\(choice)%") }
         floorPopUp.target = self
         floorPopUp.action = #selector(settingsChanged)
-        stack.addArrangedSubview(row(label: "Stop when the battery reaches",
-                                     control: floorPopUp,
-                                     explanation: "Your Mac goes to sleep instead of running "
-                                                + "the battery flat."))
+        stack.addArrangedSubview(row(
+            label: Strings.text("settings.floor", "Stop when the battery reaches"),
+            control: floorPopUp,
+            explanation: Strings.text("settings.floor.detail",
+                                      "Your Mac goes to sleep instead of running the battery flat.")))
 
         for choice in durationChoices {
-            durationPopUp.addItem(withTitle: choice.map { "\($0 / 3600) hours" } ?? "No limit")
+            durationPopUp.addItem(withTitle: choice.map {
+                Strings.text("settings.duration.hours", "%1$lld hours", Int64($0 / 3600))
+            } ?? Strings.text("settings.duration.none", "No limit"))
         }
         durationPopUp.target = self
         durationPopUp.action = #selector(settingsChanged)
-        stack.addArrangedSubview(row(label: "Stop after",
-                                     control: durationPopUp,
-                                     explanation: "Lidwing turns itself off after this long, "
-                                                + "even if you forget."))
+        stack.addArrangedSubview(row(
+            label: Strings.text("settings.duration", "Stop after"),
+            control: durationPopUp,
+            explanation: Strings.text("settings.duration.detail",
+                                      "Lidwing turns itself off after this long, "
+                                      + "even if you forget.")))
 
         thermalCheckbox.target = self
         thermalCheckbox.action = #selector(settingsChanged)
         stack.addArrangedSubview(withExplanation(
             thermalCheckbox,
-            "A closed lid blocks airflow. Lidwing stops before your Mac overheats."))
+            Strings.text("settings.thermal.detail",
+                         "A closed lid blocks airflow. Lidwing stops before your Mac overheats.")))
 
         stack.addArrangedSubview(separator())
-        stack.addArrangedSubview(sectionHeader("Sound"))
+        stack.addArrangedSubview(sectionHeader(Strings.text("settings.sound", "Sound")))
 
         soundCheckbox.target = self
         soundCheckbox.action = #selector(settingsChanged)
         stack.addArrangedSubview(withExplanation(
             soundCheckbox,
-            "You can't see the screen with the lid closed, so Lidwing says it out loud."))
+            Strings.text("settings.sound.detail",
+                         "You can't see the screen with the lid closed, "
+                         + "so Lidwing says it out loud.")))
 
         stack.addArrangedSubview(separator())
         for view in agentsSection() { stack.addArrangedSubview(view) }
         stack.addArrangedSubview(separator())
 
-        let warning = NSTextField(labelWithString:
-            "\u{26A0}\u{FE0E} Don't put your Mac in a bag while Lidwing is on.")
+        let warning = NSTextField(labelWithString: Strings.text(
+            "settings.bagWarning",
+            "\u{26A0}\u{FE0E} Don't put your Mac in a bag while Lidwing is on."))
         warning.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         warning.textColor = .secondaryLabelColor
         stack.addArrangedSubview(warning)
@@ -138,11 +153,12 @@ final class SettingsWindowController: NSWindowController {
     /// Every integration is off by default, and the only button that writes anything is
     /// labelled with what it will show you first.
     private func agentsSection() -> [NSView] {
-        var views: [NSView] = [sectionHeader("Coding agents")]
+        var views: [NSView] = [sectionHeader(Strings.text("settings.agents", "Coding agents"))]
 
-        let note = NSTextField(labelWithString:
+        let note = NSTextField(labelWithString: Strings.text(
+            "settings.agents.detail",
             "Lidwing can make a sound when your agent is waiting for you, so you hear it with "
-            + "the lid closed. It shows you every line before it writes one.")
+            + "the lid closed. It shows you every line before it writes one."))
         note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         note.textColor = .secondaryLabelColor
         note.lineBreakMode = .byWordWrapping
@@ -151,15 +167,18 @@ final class SettingsWindowController: NSWindowController {
 
         for agent in IntegrationInstaller.Agent.allCases {
             let present = IntegrationInstaller.isPresent(agent)
-            let label = NSTextField(labelWithString:
-                present ? "\(agent.displayName) - found at ~/\(agent.relativePath)"
-                        : "\(agent.displayName) - not installed")
-            let add = NSButton(title: "Show What Will Be Written\u{2026}",
+            let label = NSTextField(labelWithString: present
+                ? Strings.text("settings.agents.found", "%1$@ - found at ~/%2$@",
+                               agent.displayName, agent.relativePath)
+                : Strings.text("settings.agents.missing", "%1$@ - not installed",
+                               agent.displayName))
+            let add = NSButton(title: Strings.text("settings.agents.show",
+                                                   "Show What Will Be Written\u{2026}"),
                                target: self, action: #selector(addIntegration(_:)))
             add.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
             add.isEnabled = present
-            let remove = NSButton(title: "Remove", target: self,
-                                  action: #selector(removeIntegration(_:)))
+            let remove = NSButton(title: Strings.text("settings.agents.remove", "Remove"),
+                                  target: self, action: #selector(removeIntegration(_:)))
             remove.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
             remove.isEnabled = present
             let row = NSStackView(views: [label, add, remove])
@@ -249,14 +268,16 @@ final class SettingsWindowController: NSWindowController {
         // asks. Declining puts the control back rather than silently ignoring the click.
         if duration == nil && coordinator.machine.settings.maxDurationSeconds != nil {
             let alert = NSAlert()
-            alert.messageText = "Run with no time limit?"
-            alert.informativeText =
+            alert.messageText = Strings.text("settings.noLimit.title", "Run with no time limit?")
+            alert.informativeText = Strings.text(
+                "settings.noLimit.body",
                 "The battery and heat limits still apply, so Lidwing will still stop before "
                 + "your Mac runs flat or gets too hot. But it will not stop just because time "
-                + "passed, and a forgotten Lidwing is how a laptop ends up warm in a bag."
+                + "passed, and a forgotten Lidwing is how a laptop ends up warm in a bag.")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Cancel")
-            alert.addButton(withTitle: "Remove the Time Limit")
+            alert.addButton(withTitle: Strings.text("button.cancel", "Cancel"))
+            alert.addButton(withTitle: Strings.text("settings.noLimit.confirm",
+                                                    "Remove the Time Limit"))
             NSApp.activate(ignoringOtherApps: true)
             if alert.runModal() != .alertSecondButtonReturn {
                 duration = coordinator.machine.settings.maxDurationSeconds
