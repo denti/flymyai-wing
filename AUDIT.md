@@ -365,6 +365,18 @@ SUMMARY pass=9 fail=4
 Anything in this project that waits on another process now has a deadline, because the failure
 mode without one is a green-looking job that never finished and a person who has to guess why.
 
+### And a gate that should have existed from the start
+
+The shell scripts are a large part of this product — the M0 experiment, the fault injection, the
+performance gate, the smoke test — and every one of them runs on a machine I cannot debug.
+macOS ships bash 3.2; this box has 5.x.
+
+`shellcheck -S warning` over all of them found four things on its first run. Two were real:
+`[ cond ] && ok "…" || bad "…"` written as if it were if-then-else. In a **test** script that is
+a genuine hazard, because a spurious `C` prints a failure that did not happen — and a test that
+can report a failure it did not observe is worse than no test at all. It is now part of both the
+local gate and CI, and it has been seen red.
+
 **Round 7 verdict:** one defect in the test infrastructure, found by CI behaving oddly rather
 than by CI going red — and it was only ever going to appear on the platform the product
-actually ships to.
+actually ships to. Plus a whole category of script defect that nothing had been looking for.

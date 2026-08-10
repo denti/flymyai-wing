@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 6** · 2026-08-10
+**Cycle 7** · 2026-08-10
 
 ## PROVEN
 
@@ -12,6 +12,8 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
 - **174 unit tests, 0 failures**, 1.0 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
+  a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
   binary, 12 528 bytes, no warnings at `-Wall -Wextra -Werror`, and **4 ms with no listener**
   against a 150 ms budget. Running it found a real defect — see below.
@@ -74,6 +76,7 @@ Nothing is idling on any of these.
 | Localisation | Every user-visible string through one catalogue, with a full Russian translation. Two tests: every catalogue covers every key, and every translation keeps its placeholders |
 | Security | `SECURITY.md`: three surfaces, four mechanisms against the one failure mode that matters |
 | Hook helper | `Scripts/test-notify-helper.sh` — compiles it, runs it, measures it. Part of the ordinary gate on Linux and on macOS |
+| Script hygiene | `shellcheck -S warning` on every script, locally and in CI |
 
 ## Decisions recorded
 
@@ -93,6 +96,7 @@ Nothing is idling on any of these.
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 7 (CI behaving oddly) | A macOS job stopped making progress | **A test that hung instead of failing.** `sun_path` is 104 bytes on macOS and 108 on Linux; the test's socket path fitted only the larger. The listener's `strncpy` truncated and bound elsewhere, `lidwing-notify` correctly refused the over-long path, and `accept()` waited forever. Everything that waits now has a deadline. |
 | 6 (code vs the specification) | Read the transitions with `DESIGN.md` open beside them | **On a Mac with no lid, nothing ever concluded that.** `lidState` correctly stays `.unknown` while the lid driver has not reported — but nothing turned that into a decision, so on a Mac mini the state stayed `.unknown` forever and the user could turn Lidwing on and read *"Awake — you can close the lid"*. |
 | 5 (running, not reading) | Compile and execute the hook helper | It read stdin non-blockingly, so a payload the caller wrote a moment later was **silently lost** and every Claude Code notification would have arrived with an empty body. The test that proves it needed the race made deterministic first. |
 | 1 | Read for correctness | **Critical.** `wingprobe disarm` — the safety valve — called `arm()` on its way through and would have armed the machine it was asked to release. |
