@@ -104,8 +104,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         var items: [NSMenuItem] = []
 
         if let waiting = coordinator.agentIsWaiting {
-            let name = waiting.source == "hook" ? "Your coding agent" : waiting.source
-            items.append(disabled("\(name) is waiting for you", secondary: false))
+            let name = waiting.source == "hook"
+                ? Strings.text("agent.generic", "Your coding agent") : waiting.source
+            items.append(disabled(Strings.text("menu.agentWaiting", "%1$@ is waiting for you",
+                                               name), secondary: false))
             items.append(.separator())
         }
         items.append(disabled(content.headline, secondary: false))
@@ -115,7 +117,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         items.append(.separator())
 
         if snapshot.state == .repair {
-            let repair = NSMenuItem(title: "Repair Now\u{2026}",
+            let repair = NSMenuItem(title: Strings.text("menu.repair.action", "Repair Now\u{2026}"),
                                     action: #selector(repairNow), keyEquivalent: "")
             repair.target = self
             items.append(repair)
@@ -132,33 +134,34 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         items.append(toggle)
         items.append(.separator())
 
-        let sleepNow = NSMenuItem(title: "Sleep Now", action: #selector(sleepNow),
-                                  keyEquivalent: "")
+        let sleepNow = NSMenuItem(title: Strings.text("menu.sleepNow", "Sleep Now"),
+                                  action: #selector(sleepNow), keyEquivalent: "")
         sleepNow.target = self
         items.append(sleepNow)
 
-        let settings = NSMenuItem(title: "Settings\u{2026}", action: #selector(showSettings),
-                                  keyEquivalent: ",")
+        let settings = NSMenuItem(title: Strings.text("menu.settings", "Settings\u{2026}"),
+                                  action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         items.append(settings)
 
-        let diagnostics = NSMenuItem(title: "Copy Diagnostics", action: #selector(copyDiagnostics),
-                                     keyEquivalent: "")
+        let diagnostics = NSMenuItem(title: Strings.text("menu.diagnostics", "Copy Diagnostics"),
+                                     action: #selector(copyDiagnostics), keyEquivalent: "")
         diagnostics.target = self
         items.append(diagnostics)
         items.append(.separator())
 
-        let uninstall = NSMenuItem(title: "Uninstall Lidwing\u{2026}",
+        let uninstall = NSMenuItem(title: Strings.text("menu.uninstall", "Uninstall Lidwing\u{2026}"),
                                    action: #selector(uninstall), keyEquivalent: "")
         uninstall.target = self
         items.append(uninstall)
 
-        let about = NSMenuItem(title: "About Lidwing", action: #selector(showAbout),
-                               keyEquivalent: "")
+        let about = NSMenuItem(title: Strings.text("menu.about", "About Lidwing"),
+                               action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         items.append(about)
 
-        let quit = NSMenuItem(title: "Quit Lidwing", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: Strings.text("menu.quit", "Quit Lidwing"),
+                              action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         items.append(quit)
 

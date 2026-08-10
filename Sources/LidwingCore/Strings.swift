@@ -162,6 +162,11 @@ public enum StringKey {
         StringEntry("stopped.unsupportedState",
          "Lidwing stood down because this Mac's state changed.", ""),
         StringEntry("stopped.failure",
-         "Lidwing stopped protecting this Mac. Open Lidwing for details.", "")
+         "Lidwing stopped protecting this Mac. Open Lidwing for details.", ""),
+
+        StringEntry("agent.generic", "Your coding agent",
+         "Used when the hook did not say which tool it came from."),
+        StringEntry("agent.waiting.body", "It needs an answer before it can carry on.",
+         "Shown when the agent sent no message of its own.")
     ]
 }

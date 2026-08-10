@@ -121,6 +121,10 @@ public enum Translations {
         "stopped.agentExited": "Агент закончил работу. Lidwing выключился.",
         "stopped.watchdogLost": "Lidwing потерял сторожевой процесс и выключился.",
         "stopped.unsupportedState": "Lidwing выключился: состояние Mac изменилось.",
-        "stopped.failure": "Lidwing перестал защищать этот Mac. Откройте его, чтобы посмотреть детали."
+        "stopped.failure": "Lidwing перестал защищать этот Mac. "
+            + "Откройте его, чтобы посмотреть детали.",
+
+        "agent.generic": "Ваш агент",
+        "agent.waiting.body": "Ему нужен ответ, чтобы продолжить."
     ]
 }
