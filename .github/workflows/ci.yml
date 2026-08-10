@@ -64,6 +64,14 @@ jobs:
             echo "the suite reported failures"
             exit 1
           fi
+          # A skipped test is not a passing test. One of these hid a socket the test could not
+          # create behind a green suite and a quiet "1 test skipped"; the suite has no XCTSkip
+          # in it now, so any reappearance is a decision somebody should have to make on purpose.
+          if grep -qE '[0-9]+ tests? skipped' linux-test.log; then
+            grep -E 'skipped' linux-test.log | tail -5
+            echo "a test was skipped; empty is not success"
+            exit 1
+          fi
       # The hook helper's contract is about timing and exit codes, which no Swift test can
       # check. It is plain POSIX C, so it runs here rather than waiting for a macOS runner.
       - name: Notify-helper behaviour
@@ -148,6 +156,14 @@ jobs:
           if grep -qE 'with [1-9][0-9]* failures?' macos-test.log; then
             grep -E 'with [1-9][0-9]* failures?' macos-test.log | tail -3
             echo "the suite reported failures"
+            exit 1
+          fi
+          # A skipped test is not a passing test. One of these hid a socket the test could not
+          # create behind a green suite and a quiet "1 test skipped"; the suite has no XCTSkip
+          # in it now, so any reappearance is a decision somebody should have to make on purpose.
+          if grep -qE '[0-9]+ tests? skipped' macos-test.log; then
+            grep -E 'skipped' macos-test.log | tail -5
+            echo "a test was skipped; empty is not success"
             exit 1
           fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4

@@ -560,7 +560,25 @@ failures that does not depend on an exit code at all.
 **The lesson, stated plainly:** every "CI is green" in this repository before `e3d5a9b` was
 worth less than it claimed, and `STATUS.md` has been corrected rather than quietly updated.
 
-**Round 9 verdict:** seven defects, none capable of stranding a Mac, three of them about other
+### 9.8 — the same mistake, by the person who had just diagnosed it
+
+The first genuinely meaningful green macOS run reported "249 tests, **1 test skipped**, 0
+failures". The skipped one was `testAListeningSocketIsOwnerOnly` - the test written an hour
+earlier to prove finding 9.3 - and it was skipped because it bound its socket under
+`NSTemporaryDirectory()`, which is the exact defect diagnosed in 9.7, reproduced by the person
+who diagnosed it, in the same session, in the file next to it.
+
+Worse than the repeat: it reported that failure as `XCTSkip`. A test that could not run became
+a green suite with a quiet "1 test skipped" - the precise shape of "empty read as success" that
+this project treats as a bug and that the brief calls out by name. The socket-permission
+assertion for 9.3 was therefore never actually executed, and I described it in a commit message
+as though it had been.
+
+Fixed: a short path, an asserted path length, and `XCTUnwrap` instead of `XCTSkip`. There is now
+no `XCTSkip` anywhere in the suite, and CI fails on any reported skip, so putting one back has
+to be a deliberate decision somebody defends.
+
+**Round 9 verdict:** eight defects, none capable of stranding a Mac, three of them about other
 accounts on a shared Mac rather than about the same-uid attacker this product cannot defend
 against and does not claim to. The fourth was a document quietly claiming things that were not
 true, which in this project is a defect like any other.

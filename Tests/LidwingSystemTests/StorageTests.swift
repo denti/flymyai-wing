@@ -7,6 +7,12 @@ import XCTest
 /// `StatePermissions` decides the rule and is tested on Linux. These are the syscalls: that an
 /// existing directory is actually repaired, that a symlink is actually refused, and that the
 /// files written inside are not readable by anyone else.
+private enum StorageTestFailure: Error {
+    /// The test could not read back something it had just created. That is a broken test, and
+    /// it must be reported as a failure rather than as a skip.
+    case couldNotStat(String)
+}
+
 final class StorageTests: XCTestCase {
 
     /// A fresh directory per test. Not an implicitly-unwrapped property: a nil there fails
@@ -24,8 +30,11 @@ final class StorageTests: XCTestCase {
 
     private func mode(of url: URL) throws -> Int {
         var status = stat()
+        // A failure to stat is a failure, not a skip. Every caller here has just created the
+        // thing it is asking about, so `lstat` failing means the test's own setup did not do
+        // what it says - and reporting that as "skipped" hides it inside a green suite.
         guard lstat(url.path, &status) == 0 else {
-            throw XCTSkip("could not stat \(url.path)")
+            throw StorageTestFailure.couldNotStat(url.path)
         }
         return Int(status.st_mode) & 0o7777
     }
@@ -79,15 +88,27 @@ final class StorageTests: XCTestCase {
     }
 
     /// The socket has to be private from the instant it exists, not one call later.
+    ///
+    /// Two mistakes of mine live in this test's history, and both are worth the comment.
+    ///
+    /// It used to bind inside `sandbox`, which is under `NSTemporaryDirectory()` - on a CI
+    /// runner that is 48 characters before anything of ours, and `sun_path` holds 103 plus a
+    /// NUL. So it could not bind. That is the same defect I had diagnosed in `NotifyServerTests`
+    /// an hour earlier, reproduced by the person who diagnosed it.
+    ///
+    /// Worse, it reported that failure as `XCTSkip`, which turned a test that could not run into
+    /// a green suite with a quiet "1 test skipped" - the exact shape of "empty read as success"
+    /// this project treats as a bug. A socket this test cannot create is a failure, not a
+    /// non-result.
     func testAListeningSocketIsOwnerOnly() throws {
-        let path = sandbox.appendingPathComponent("s.sock").path
+        let path = "/tmp/lw-mode-\(UUID().uuidString.prefix(8)).sock"
+        XCTAssertLessThan(path.utf8.count, 104, "the test's own path is too long for sun_path")
         // A umask that would otherwise leave the socket group- and world-readable.
         let previous = umask(0o000)
         defer { _ = umask(previous) }
 
-        guard let descriptor = UnixSocket.listen(path: path) else {
-            throw XCTSkip("could not bind a socket in the sandbox")
-        }
+        let descriptor = try XCTUnwrap(UnixSocket.listen(path: path),
+                                       "could not bind \(path) - this test proved nothing")
         defer { _ = close(descriptor); _ = unlink(path) }
 
         var status = stat()
