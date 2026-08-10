@@ -107,6 +107,8 @@ public final class StateMachine {
         case .launch:
             return onLaunch()
 
+        case .armAtLaunch:
+            return onArmAtLaunch()
         case .userArm:
             return onUserArm()
 

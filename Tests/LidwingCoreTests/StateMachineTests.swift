@@ -54,7 +54,7 @@ final class StateMachineTests: XCTestCase {
 
         let effects = machine.handle(.userArm)
 
-        XCTAssertEqual(effects, [.refuseArm(.watchdogUnavailable)])
+        XCTAssertEqual(effects, [.refuseArm(.watchdogUnavailable, .askNow)])
         XCTAssertEqual(machine.state, .idle)
         XCTAssertTrue(system.clamshellWrites.isEmpty, "we never touch the machine without a dead-man")
         XCTAssertNil(ledger.currentLedger)
@@ -85,7 +85,7 @@ final class StateMachineTests: XCTestCase {
         system.onAC = true
         system.onlineDisplayCount = 2
 
-        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.externalDisplayOnAC)])
+        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.externalDisplayOnAC, .askNow)])
         XCTAssertEqual(machine.state, .idle)
         XCTAssertTrue(system.clamshellWrites.isEmpty)
     }
@@ -95,7 +95,9 @@ final class StateMachineTests: XCTestCase {
         system.foreignAssertionHolders = [ForeignHolder(pid: 812, name: "Amphetamine")]
 
         let effects = machine.handle(.userArm)
-        XCTAssertEqual(effects, [.refuseArm(.foreignHolder(ForeignHolder(pid: 812, name: "Amphetamine")))])
+        XCTAssertEqual(effects,
+                       [.refuseArm(.foreignHolder(ForeignHolder(pid: 812, name: "Amphetamine")),
+                                   .askNow)])
         XCTAssertEqual(machine.state, .idle)
     }
 
@@ -104,7 +106,7 @@ final class StateMachineTests: XCTestCase {
         system.batteryCurrent = 900        // 18 %
         system.batteryMax = 5000
 
-        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.batteryTooLow)])
+        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.batteryTooLow, .askNow)])
     }
 
     func testBagWarningIsShownOnBatteryAndNotRepeatedWithinAWeek() {
@@ -512,6 +514,106 @@ final class StateMachineTests: XCTestCase {
         XCTAssertEqual(machine.state, .idle)
     }
 
+    // MARK: arming itself at launch (decision 0012)
+
+    /// Install to value is zero steps: launch and it is already protecting.
+    func testItArmsItselfAtLaunchOnAHealthyMac() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .idle)
+
+        machine.handle(.armAtLaunch)
+
+        XCTAssertEqual(machine.state, .arming)
+        XCTAssertEqual(system.lastClamshellWrite, true)
+    }
+
+    /// **The invariant this whole path lives under.** Presenting a modal from the launch path is
+    /// what crashed v0.1.0, and arming at launch means the refusal path runs there too - on a Mac
+    /// with another keep-awake tool, refusal is the *likely* outcome, not the rare one.
+    func testNothingOnTheLaunchPathMayEverInterrupt() {
+        let cases: [(String, (MockSystem) -> Void)] = [
+            ("another app holds it", { $0.foreignAssertionHolders =
+                [ForeignHolder(pid: 812, name: "caffeinate")] }),
+            ("the battery is below the floor", { $0.batteryCurrent = 100; $0.batteryMax = 5000 }),
+            ("the Mac is too hot", { $0.thermalState = .critical }),
+            ("there is no lid", { $0.lidState = .noLid }),
+            ("an external display on AC", { $0.onlineDisplayCount = 2; $0.onAC = true })
+        ]
+        for (name, arrange) in cases {
+            let (system, _, _, _, machine) = TestFixture.harness()
+            arrange(system)
+            machine.handle(.launch)
+
+            for effect in machine.handle(.armAtLaunch) {
+                switch effect {
+                case .refuseArm(_, let prompt), .offerRepair(_, let prompt):
+                    XCTAssertEqual(prompt, .quietly,
+                                   "\(name): the launch path asked to open a dialog")
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    /// A Mac that another tool is holding awake: Lidwing stands down and says who, rather than
+    /// fighting for a global bit or claiming a protection it is not providing.
+    func testItStandsDownAtLaunchWhenSomethingElseHoldsTheMac() {
+        let (system, _, _, watchdog, machine) = TestFixture.harness()
+        system.foreignAssertionHolders = [ForeignHolder(pid: 812, name: "caffeinate")]
+        machine.handle(.launch)
+
+        let effects = machine.handle(.armAtLaunch)
+
+        XCTAssertEqual(effects,
+                       [.refuseArm(.foreignHolder(ForeignHolder(pid: 812, name: "caffeinate")),
+                                   .quietly)])
+        XCTAssertEqual(machine.state, .idle)
+        XCTAssertTrue(system.clamshellWrites.isEmpty, "fought another tool for a global bit")
+        XCTAssertEqual(watchdog.connectAttempts, 0)
+    }
+
+    /// Launching on a machine somebody else armed must not quietly arm on top of it.
+    func testItDoesNotArmItselfIntoARepairState() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.clamshellCausesSleep = false
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .repair)
+
+        let effects = machine.handle(.armAtLaunch)
+
+        XCTAssertTrue(effects.isEmpty, "armed itself while the machine needed repair")
+        XCTAssertTrue(system.clamshellWrites.isEmpty)
+        XCTAssertEqual(machine.state, .repair)
+    }
+
+    /// Arming twice would take a second assertion and write a second ledger.
+    func testArmingAtLaunchTwiceDoesNothingTheSecondTime() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        let writes = system.clamshellWrites.count
+
+        XCTAssertTrue(machine.handle(.armAtLaunch).isEmpty)
+        XCTAssertEqual(system.clamshellWrites.count, writes)
+    }
+
+    /// The duration lease has to start at launch. An app that turns itself on at login and only
+    /// starts counting at the first lid close would hold a Mac awake all day.
+    func testTheDurationLeaseStartsWhenItArmsItself() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+
+        system.advance(machine.settings.maxDurationSeconds.map(Double.init) ?? 0 + 1)
+        machine.handle(.reconcileTick)
+
+        XCTAssertNotEqual(machine.state, .armed, "the lease never started")
+    }
+
     func testLaunchWithALedgerFromAnotherProcessStandsDown() throws {
         let (system, ledger, _, _, machine) = TestFixture.harness()
         system.clamshellCausesSleep = false
@@ -570,7 +672,7 @@ final class StateMachineTests: XCTestCase {
         system.lidState = .noLid
         machine.handle(.launch)
         XCTAssertEqual(machine.state, .unsupported)
-        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.unsupportedOS)])
+        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.unsupportedOS, .askNow)])
     }
 
     // MARK: stress
@@ -758,7 +860,7 @@ final class NoLidTests: XCTestCase {
         system.lidState = .noLid            // the host concluded it after ten silent seconds
         machine.handle(.lidDeterminedAbsent)
         XCTAssertEqual(machine.state, .unsupported)
-        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.unsupportedOS)])
+        XCTAssertEqual(machine.handle(.userArm), [.refuseArm(.unsupportedOS, .askNow)])
     }
 
     func testTheConclusionIsReversible() {

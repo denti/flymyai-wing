@@ -35,6 +35,9 @@ public enum LidwingMode: String, Equatable, Sendable {
 
 public enum LidwingEvent: Equatable, Sendable {
     case launch
+    /// Lidwing started and is turning itself on, per decision 0012. Distinct from `userArm`
+    /// because nothing on this path may interrupt the user.
+    case armAtLaunch
     case userArm
     case userDisarm
     case repairRequested
@@ -112,11 +115,11 @@ public enum UserNotice: Equatable, Sendable {
 }
 
 /// Everything the state machine wants the host to do that is not a system read or write.
-/// Whether a repair offer may open a dialog.
+/// Whether an effect may open a dialog.
 ///
 /// Not a presentation detail: it is the difference between "the app decided to interrupt you"
 /// and "you asked for this". Only the second may block.
-public enum RepairPrompt: String, Equatable, Sendable {
+public enum Prompt: String, Equatable, Sendable {
     /// Show it in the menu and draw the eye. **Never** a modal. This is what launch emits.
     case quietly
     /// The user asked for something that needs a decision, so a dialog is expected and correct.
@@ -133,11 +136,15 @@ public enum LidwingEffect: Equatable, Sendable {
     /// minute to sleep", attributed to us.
     case allowPowerChange(UInt)
     case requestSystemSleep
-    case refuseArm(ArmRefusal)
+    /// Lidwing declined to turn on, and why. The `Prompt` is the same rule as `offerRepair`:
+    /// the launch path may never block. It matters more here than it looks, because arming at
+    /// launch means the refusal path *also* runs at launch - and on a Mac with another
+    /// keep-awake tool running, refusal is the common case, not the rare one.
+    case refuseArm(ArmRefusal, Prompt)
     /// Ground truth is non-stock and we may have caused it. Offer one-click Repair; never act
     /// silently, because a silent clear can stomp powerd or another tool.
     ///
-    /// The `RepairPrompt` is load-bearing and exists because of a real crash. At launch this
+    /// The `Prompt` is load-bearing and exists because of a real crash. At launch this
     /// used to be presented as a modal `NSAlert`, run synchronously inside
     /// `applicationDidFinishLaunching` - which is itself inside the Apple Event handler. The
     /// nested modal run loop spun while AppKit was still finishing launch and popped an
@@ -148,7 +155,7 @@ public enum LidwingEffect: Equatable, Sendable {
     /// already in an odd state - a previous instance died, a second copy is running, another
     /// utility set the same global bit - so it is the one path guaranteed to execute on a Mac
     /// that already needs help.
-    case offerRepair(RepairCause, RepairPrompt)
+    case offerRepair(RepairCause, Prompt)
     /// Ground truth is non-stock and the ledger says it was not us.
     case showForeignHolder
     /// Hold off App Nap and sudden termination for the armed session.

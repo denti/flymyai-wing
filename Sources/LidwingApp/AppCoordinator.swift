@@ -22,6 +22,8 @@ final class AppCoordinator {
     /// Why the machine looked non-stock at launch, kept so the menu item can explain it when the
     /// user asks. Set without ever opening a dialog.
     private(set) var pendingRepairCause: RepairCause?
+    /// Why Lidwing did not turn itself on at launch, kept for the menu. Never shown as a dialog.
+    private(set) var pendingRefusal: ArmRefusal?
     /// Set when a coding agent says it is blocked, cleared when the user opens the menu.
     /// Advisory only: invariant I8 means nothing on that socket can arm anything, and this
     /// property is the entire extent of its reach into the app.
@@ -117,6 +119,23 @@ final class AppCoordinator {
 
         readWatchdogRecoveryRecord()
         deliver(machine.handle(.launch))
+
+        // Decision 0012: install to value is zero steps. Drag to Applications, launch, and it is
+        // already protecting - which is only possible because Tier 1 needs no privileges, and is
+        // the whole payoff of that architecture.
+        //
+        // Deferred by one main-loop turn on purpose. `start()` runs inside
+        // `applicationDidFinishLaunching`, which is inside the Apple Event handler, and the
+        // refusal and repair paths both reach UI. Nothing here may present a dialog - the
+        // `.quietly` prompt guarantees that structurally - but keeping the arm off the launch
+        // turn also keeps the menu-bar item and the first notification out of it, and this is
+        // the one code path where being cautious about that has already been earned.
+        if preferences.armAtLaunch {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.deliver(self.machine.handle(.armAtLaunch))
+            }
+        }
 
         // `AppleClamshellState` is absent on a laptop until the lid driver's first report, so
         // an absent key at launch is not evidence of a desktop — coercing it would disable the
@@ -307,6 +326,43 @@ final class AppCoordinator {
 
     // MARK: effects out
 
+    /// Lidwing declined to turn on. Returns whether the menu needs rebuilding.
+    ///
+    /// The `.quietly` branch is the one that matters. It arrives when Lidwing tried to turn
+    /// itself on at launch and could not - and on a Mac that already has another keep-awake tool
+    /// running, that is the ordinary outcome rather than the rare one. The menu already explains
+    /// it, naming the other holder, which is exactly the conflict notice decision 0012 asks for.
+    /// A dialog at login would be both an interruption and, from the launch turn, a crash.
+    private func refused(_ refusal: ArmRefusal, _ prompt: Prompt) -> Bool {
+        log.emit(LogCatalogue.armRefused, .power, ["reason": String(describing: refusal)])
+        switch prompt {
+        case .quietly:
+            pendingRefusal = refusal
+            return true
+        case .askNow:
+            presentRefusal(refusal)
+            return false
+        }
+    }
+
+    /// Ground truth is non-stock and we did not do it.
+    ///
+    /// `.quietly` never presents: this arrives from `onLaunch`, which runs inside
+    /// `applicationDidFinishLaunching`, inside the Apple Event handler, and a nested modal run
+    /// loop there pops an autorelease pool the launch machinery still owns. That crashed a
+    /// user's Mac at `0x94`. The glyph and the menu carry it instead, with a `Repair Now...`
+    /// item for when the user wants it.
+    private func repairOffered(_ cause: RepairCause, _ prompt: Prompt) -> Bool {
+        switch prompt {
+        case .quietly:
+            pendingRepairCause = cause
+            return true
+        case .askNow:
+            presentRepair(cause)
+            return false
+        }
+    }
+
     /// Performs one effect. Returns whether the menu has to be rebuilt afterwards.
     ///
     /// Split out of `deliver` when the switch crossed the complexity limit. That limit earns its
@@ -326,26 +382,10 @@ final class AppCoordinator {
             observers?.allowPowerChange(argument)
         case .requestSystemSleep:
             system.requestSystemSleep()
-        case .refuseArm(let refusal):
-            log.emit(LogCatalogue.armRefused, .power,
-                     ["reason": String(describing: refusal)])
-            presentRefusal(refusal)
+        case .refuseArm(let refusal, let prompt):
+            return refused(refusal, prompt)
         case .offerRepair(let cause, let prompt):
-            switch prompt {
-            case .quietly:
-                // Never a modal here. This arrives from `onLaunch`, which runs inside
-                // `applicationDidFinishLaunching`, which is itself inside the Apple Event
-                // handler - and a nested modal run loop there pops an autorelease pool the
-                // launch machinery still owns. That crashed on a user's Mac at 0x94.
-                //
-                // The menu already carries this state in words, with a "Repair Now..." item, and
-                // the glyph already shows it. So the launch path draws the eye and says nothing
-                // it cannot say without blocking.
-                pendingRepairCause = cause
-                return true
-            case .askNow:
-                presentRepair(cause)
-            }
+            return repairOffered(cause, prompt)
         case .beginActivity:
             beginActivity()
         case .endActivity:

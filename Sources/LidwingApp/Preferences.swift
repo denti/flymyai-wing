@@ -21,6 +21,7 @@ final class Preferences {
         static let lastBagWarning = "lastBagWarningAt"
         static let soundEnabled = "soundEnabled"
         static let lastVerifiedOS = "lastVerifiedOS"
+        static let armAtLaunch = "armAtLaunch"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -32,7 +33,11 @@ final class Preferences {
             Key.thermalGuard: true,
             Key.mode: LidwingMode.manual.rawValue,
             Key.hasEverArmed: false,
-            Key.soundEnabled: true
+            Key.soundEnabled: true,
+            // On by default, and that is the product: zero steps between installing and being
+            // protected. It is a preference rather than a constant so somebody who wants the
+            // old behaviour can have it, not because the default is in doubt.
+            Key.armAtLaunch: true
         ])
     }
 
@@ -64,6 +69,11 @@ final class Preferences {
     var lastVerifiedOS: String? {
         get { defaults.string(forKey: Key.lastVerifiedOS) }
         set { defaults.set(newValue, forKey: Key.lastVerifiedOS) }
+    }
+
+    var armAtLaunch: Bool {
+        get { defaults.bool(forKey: Key.armAtLaunch) }
+        set { defaults.set(newValue, forKey: Key.armAtLaunch) }
     }
 
     var hasEverArmed: Bool {

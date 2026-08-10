@@ -71,7 +71,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         // Read the thickness; never hardcode 22 or 24. Three different numbers exist on one
         // machine: the drawable status item, the menu-bar band, and the notch safe area.
-        let shape = StatusIcon.shape(for: snapshot.state)
+        let shape = StatusIcon.shape(for: snapshot)
         button.image = StatusIcon.image(for: shape, thickness: NSStatusBar.system.thickness)
 
         // Under Increase Contrast a dimmed thin outline is the first cue to vanish, so the OFF

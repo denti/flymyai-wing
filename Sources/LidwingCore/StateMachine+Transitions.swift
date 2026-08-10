@@ -93,6 +93,22 @@ extension StateMachine {
     // MARK: Arming
 
     func onUserArm() -> [LidwingEffect] {
+        arm(prompt: .askNow)
+    }
+
+    /// Arming because Lidwing just started, not because anybody clicked.
+    ///
+    /// Decision 0012: install to value is zero steps. The only difference from a user asking is
+    /// that nothing here may interrupt - a refusal at launch is shown in the menu, never in a
+    /// dialog. That is not a detail: presenting a modal from the launch path is what crashed
+    /// v0.1.0, and a refusal is the *likely* outcome on a Mac that already has another
+    /// keep-awake tool on it.
+    func onArmAtLaunch() -> [LidwingEffect] {
+        guard state == .idle else { return [] }
+        return arm(prompt: .quietly)
+    }
+
+    private func arm(prompt: Prompt) -> [LidwingEffect] {
         switch state {
         case .idle:
             break
@@ -106,9 +122,9 @@ extension StateMachine {
                 ledgerStore.delete()
             }
         case .repair:
-            return [.offerRepair(repairCause ?? .noLedger, .askNow)]
+            return [.offerRepair(repairCause ?? .noLedger, prompt)]
         case .unsupported:
-            return [.refuseArm(.unsupportedOS)]
+            return [.refuseArm(.unsupportedOS, prompt)]
         case .arming, .armed, .degraded, .disarming:
             return []
         }
@@ -118,20 +134,20 @@ extension StateMachine {
             // macOS already keeps a Mac awake with the lid closed when an external display is
             // attached on AC. Saying so costs a user and buys the credibility that carries the
             // other ninety-nine.
-            return [.refuseArm(.externalDisplayOnAC)]
+            return [.refuseArm(.externalDisplayOnAC, prompt)]
         }
         if let refusal = SafetyPolicy.refusalReason(power: power,
                                                     thermal: facade.thermalState,
                                                     settings: settings,
                                                     lid: facade.lidState,
                                                     foreignHolders: facade.foreignAssertionHolders) {
-            return [.refuseArm(refusal)]
+            return [.refuseArm(refusal, prompt)]
         }
 
         // The dead-man goes up first. We never hold the mechanism without one.
         guard watchdog.connect() else {
             audit.note(.watchdogUnavailable, at: facade.now, context: [:])
-            return [.refuseArm(.watchdogUnavailable)]
+            return [.refuseArm(.watchdogUnavailable, prompt)]
         }
 
         // The ledger is written before the first mutation so a panic between them is

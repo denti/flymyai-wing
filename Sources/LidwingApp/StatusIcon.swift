@@ -22,6 +22,19 @@ enum StatusIcon {
         case degraded      // solid wing + warning dot
         case failed        // solid wing + cross
         case unsupported   // outline wing, dimmed by appearsDisabled
+        /// Another app is holding this Mac awake, so Lidwing stood down. Outline wing plus the
+        /// same attention dot the degraded state uses.
+        ///
+        /// The grammar across the whole set is two independent cues: **fill** means Lidwing is
+        /// protecting, and a **dot** means something wants attention. Solid plus dot is "still
+        /// protecting, but a guard is warning"; outline plus dot is "not protecting, and here is
+        /// why". Neither uses colour, because template images cannot carry any.
+        ///
+        /// Decision 0012 makes this a headline state rather than a diagnostic: on a Mac with
+        /// `caffeinate` running - which is the owner's Mac right now - it is the state the user
+        /// will actually see, and an app that looked simply "off" there would be hiding the one
+        /// fact that explains the machine's behaviour.
+        case foreign
     }
 
     /// Rendered images, keyed by shape and thickness.
@@ -78,6 +91,10 @@ enum StatusIcon {
         case .degraded:
             wing.fill()
             badgeDot(in: side, filled: true).fill()
+        case .foreign:
+            wing.lineWidth = max(1.0, side / 22.0)
+            wing.stroke()
+            badgeDot(in: side, filled: true).fill()
         case .failed:
             wing.fill()
             let cross = crossPath(in: side)
@@ -133,6 +150,14 @@ enum StatusIcon {
         path.move(to: NSPoint(x: originX + arm, y: originY))
         path.line(to: NSPoint(x: originX, y: originY + arm))
         return path
+    }
+
+    /// Takes the whole snapshot rather than the state alone, because "another app is in control"
+    /// is not a state of ours - we are idle, and idle is exactly what it would otherwise look
+    /// like.
+    static func shape(for snapshot: MenuPresenter.Snapshot) -> Shape {
+        if snapshot.state == .idle && snapshot.foreignHolder != nil { return .foreign }
+        return shape(for: snapshot.state)
     }
 
     static func shape(for state: LidwingState) -> Shape {
