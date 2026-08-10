@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **135** |
+| Tests | **142** |
 | Failures | 0 |
 | Wall clock | 0.83 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -52,9 +52,14 @@ its own bookkeeping:
 | 4 | `releaseMechanism` drops the `weSetTheBit` and desktop-mode guards | invariant I7: clearing a bit powerd owns | **1** |
 | 5 | `ClaudeSettingsPatch.install` appends without removing our previous entry | a second hook on every install, and a duplicate notification for every event | **3** |
 | 6 | `CodexConfigPatch.install` writes our command without chaining | silently taking away a feature the user already had | **2** |
+| 7 | Repair calls `setClamshellSleepDisabled(false)` instead of `repairClamshellState()` | the original defect from audit round 3: the button reports success and changes nothing | **3** |
 
-Each was applied, measured, and reverted; the suite returned to **135 passed, 0 failed** after
+Each was applied, measured, and reverted; the suite returned to **142 passed, 0 failed** after
 every one.
+
+Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
+code until audit round 3, and the suite passed with it. The tests that catch it now exist
+because the mock was corrected to model a guard the real machine has and the mock did not.
 
 **Mutation 4 is the thin one, and it is worth saying so.** Exactly one test
 (`testWeNeverClearTheBitInAConfigurationPowerdOwns`) stands between that change and shipping,

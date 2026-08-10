@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 2** · 2026-08-10
+**Cycle 3** · 2026-08-10
 
 ## PROVEN
 
@@ -11,10 +11,15 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **112 unit tests, 0 failures**, 0.7 s on Linux; the same suite plus 9 macOS-only tests in CI.
-- **The suite has been proven able to fail, four ways.** Deliberate mutations produced 21, 14,
-  9 and 1 failures respectively. Numbers and mutations in `TESTING.md`; the one caught by a
-  single test is called out as the weak spot rather than averaged away.
+- **142 unit tests, 0 failures**, 1.2 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **A `.dmg` exists.** `Scripts/build.sh` → `sign.sh` → `package.sh` → `invariants.sh` runs
+  end to end on every push. All **14 artifact invariants** are green on the real artifact:
+  universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
+  signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
+  `UsageDescription` keys and **zero** entitlements of any kind.
+- **The suite has been proven able to fail, seven ways.** Deliberate mutations produced 21, 14,
+  9, 3, 3, 2 and 1 failures. Numbers and mutations in `TESTING.md`; the one caught by a single
+  test is called out as the weak spot rather than averaged away.
 - **1000 arm/disarm cycles** leave ground truth stock, zero leaked assertions, no ledger.
 - **12 000 random state transitions** never leave the machine reporting protection without
   owning the mechanism.
@@ -57,6 +62,11 @@ Nothing is idling on any of these.
 | Packaging | `build.sh` (universal via two builds + `lipo`), `sign.sh` (inside-out, never `--deep`), `notarize.sh`, `package.sh`, `invariants.sh` |
 | Gates | `Scripts/check.sh` runs workflows, purity, build, tests and lint from Linux in one command |
 | Fault injection | `Scripts/fault-injection.sh` — SIGKILL while armed, corrupt ledger, watchdog killed. Needs a real Mac |
+| Integrations | Order-preserving JSON for `~/.claude/settings.json`; a line editor for `~/.codex/config.toml` that chains rather than replaces an occupied `notify`. Backup, original file mode, temp file in the same directory, `rename(2)` |
+| Auto mode | Arms while `claude`, `codex` or `cursor-agent` runs; stands down after a grace period. The only poll in the product, and only when the user chooses it |
+| Notify socket | `lidwing-notify` and the server that receives it. Invariant I8 enforced structurally: the receiver holds no reference through which it could arm anything |
+| Settings | A real window: mode, battery floor, duration, thermal guard, sound, and the agent integrations with their diff-before-write |
+| Release | `release.yml` — test, build, sign, notarize, staple, **then** attest and checksum |
 
 ## Decisions recorded
 
@@ -71,19 +81,21 @@ Nothing is idling on any of these.
 | [0007](docs/decisions/0007-name-availability-check.md) | T5 name check | Clear everywhere reachable |
 | [0008](docs/decisions/0008-when-lidwing-makes-a-sound.md) | Chime on arm vs on lid close | Lid close, and standing down with the lid shut |
 
-## Audit
+## Audit — three rounds, all findings fixed
 
-`AUDIT.md` round 1: one **critical** defect — `wingprobe disarm`, the safety valve, armed the
-machine instead of releasing it — plus two that would have made the CI signal meaningless
-without looking broken. Five rejected findings recorded with reasons.
+| Round | Method | Worst finding |
+|---|---|---|
+| 1 | Read for correctness | **Critical.** `wingprobe disarm` — the safety valve — called `arm()` on its way through and would have armed the machine it was asked to release. |
+| 2 | Read as a running process | A modal dialog spins its own run loop, so the reconcile timer fired underneath one and could stack a second dialog on top. And a verify tick that returned early without stopping its own 10 Hz timer. |
+| 3 | Fresh eyes, trace every write | **High.** The Repair button could not clear a bit left behind by a previous process, and reported success. It survived two audits and 135 passing tests because `MockSystem` wrote unconditionally — a mock more permissive than the machine does not test, it reassures. |
+
+Eleven rejected findings are recorded with their reasons.
 
 ## NEXT
 
-1. Round 2 of the audit, against the app's runtime behaviour rather than its logic.
-2. A soak harness measuring the app's own idle CPU, memory and file-descriptor growth as hard
-   numbers, since `CRAFT.md` §7.1 states them as gates and none of them is measured yet.
-3. The compatibility smoke script (`ADDENDUM.md` §2.4), rewritten for Tier 1: canaries for
-   selector-12 reachability, bundle integrity, and `SKIP` that is never `PASS`.
-4. Settings window and the remaining M2 surface.
-5. `INSTALL.md`, then the real README with the four falsify-us commands — last, per
-   `DECISIONS.md`.
+1. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
+   measurement, and `AUDIT.md` says so rather than quoting budgets as results.
+2. Localisation scaffolding — every user-visible string through `String(localized:)`.
+3. The real README with the four falsify-us commands and the compatibility table — last, per
+   `DECISIONS.md`, and only listing combinations with a green acceptance run.
+4. Everything blocked on a Mac: M0, fault injection, the perf gate, the smoke script.
