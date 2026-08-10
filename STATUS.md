@@ -13,7 +13,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   claim that used to sit here was false, and it was false in the way that matters: it was
   checkable, and nothing checked it. Both failures were the test's own socket path exceeding
   `sun_path` on a CI runner, not a product defect - but that is luck, not diligence.
-- **272 unit tests, 0 failures**, 1.7 s on Linux; the same suite plus 33 macOS-only tests in CI.
+- **278 unit tests, 0 failures**, 2.0 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -26,7 +26,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, forty-one ways**, and every gate in the
+- **The suite has been proven able to fail, forty-four ways**, and every gate in the
   repository has now been watched failing at least once except one, which is named as unproven
   in `TESTING.md` rather than listed beside the others. Deliberate mutations produced
   21, 14, 13, 9, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1
@@ -156,10 +156,11 @@ Nothing is idling on any of these.
 | [0008](docs/decisions/0008-when-lidwing-makes-a-sound.md) | Chime on arm vs on lid close | Lid close, and standing down with the lid shut |
 | [0009](docs/decisions/0009-localisation-scope.md) | Eight languages vs what can be checked | English and Russian, complete and tested; diagnostics stay English on purpose |
 
-## Audit — eleven rounds, all findings fixed
+## Audit — twelve rounds, all findings fixed
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 12 (a real machine's assertions) | Take the owner's actual `pmset -g assertions` and ask what the product would do with it | **Lidwing would never have armed on the Mac it was built for.** It refused whenever any other process held a sleep assertion - and a developer Mac running an agent has Claude holding one permanently and a `caffeinate` respawned per command. An idle assertion cannot stop a lid close, which is the whole reason this product needs selector 12, so refusing for one protected nothing and simply let the machine sleep. |
 | 11 (audit my own last change) | Ask "what did I just make worse", an hour after pushing it green | **Arming at launch would have armed a Mac with no lid.** A desktop and a laptop that has not reported its lid look identical at launch, and the refusal rule covers only `.noLid`. A Mac mini would have been held awake for the whole duration lease by a feature it cannot use. |
 | 10 (the M0 script) | Ask of the most consequential script: can this report success without proving anything? | **A PASS did not require the lid to have been closed.** Nothing sampled `AppleClamshellState`. A lid left open gives a Mac that stays awake for the most ordinary reason there is, clean counters, and a confident PASS - and the architecture would have rested on an experiment in which the thing under test never happened. |
 | 9 (read as an attacker, then a red build) | Assume a hostile same-uid process and a shared Mac; then read the CI that failed | **A compile failure reported as a passing step**, because `swift test \| tee log` runs under `bash -e` with no `pipefail` and `tee` decides the exit code. The `macos-26` canary had the same shape in both its steps, so the job whose entire purpose is to go red before a user does was structurally incapable of reporting a failing test. Every green canary before this commit proved only that the runner started. |

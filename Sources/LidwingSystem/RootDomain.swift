@@ -222,18 +222,29 @@ public enum AssertionInspector {
             guard holderPID != pid else { continue }
             for entry in entries {
                 guard let type = entry[kIOPMAssertionTypeKey as String] as? String else { continue }
-                // Only the types that actually stop a system sleep. Display-only assertions
-                // are held by half the machine and are not our business.
-                let blocking = [
-                    kIOPMAssertPreventUserIdleSystemSleep as String,
-                    "PreventSystemSleep",
-                    "NoIdleSleepAssertion"
-                ]
-                guard blocking.contains(type) else { continue }
-                let name = (entry["Process Name"] as? String)
-                    ?? (entry[kIOPMAssertionNameKey as String] as? String)
-                    ?? "pid \(holderPID)"
-                holders.append(ForeignHolder(pid: holderPID, name: name))
+                // Classified rather than filtered to a single bucket. The distinction matters:
+                // an idle-sleep hold cannot stop a lid close, so its holder is worth naming but
+                // must never stop Lidwing arming. Display and user-active holds are held by half
+                // the machine and are nobody's business.
+                let kind = PowerAssertions.kind(ofAssertionNamed: type)
+                guard kind == .idleSleep || kind == .systemSleep else { continue }
+
+                let process = (entry["Process Name"] as? String) ?? "pid \(holderPID)"
+                guard !PowerAssertions.systemOwned.contains(process) else { continue }
+                let assertionName = (entry[kIOPMAssertionNameKey as String] as? String) ?? ""
+
+                // `Timeout` is seconds remaining when the owner set one. `caffeinate -t 300`
+                // does; a persistent holder does not.
+                let timeout = (entry["TimeoutSeconds"] as? NSNumber)?.intValue
+                    ?? (entry[kIOPMAssertionTimeoutKey as String] as? NSNumber)?.intValue
+                let transient = (timeout ?? .max) <= ConflictPolicy.transientThresholdSeconds
+
+                holders.append(ForeignHolder(
+                    pid: holderPID,
+                    name: ConflictPolicy.displayName(process: process,
+                                                     assertionName: assertionName),
+                    kind: kind,
+                    isTransient: transient))
                 break
             }
         }

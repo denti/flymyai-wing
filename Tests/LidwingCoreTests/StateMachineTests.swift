@@ -90,17 +90,44 @@ final class StateMachineTests: XCTestCase {
         XCTAssertTrue(system.clamshellWrites.isEmpty)
     }
 
-    func testArmRefusedWhenAnotherAppAlreadyHoldsTheMachineAwake() {
+    /// **Corrected in decision 0013.** This used to assert that Lidwing stood down whenever any
+    /// other app held a power assertion. That was wrong, and it was wrong in the way that
+    /// mattered most: on a developer Mac running an agent - the exact machine this product
+    /// exists for - Claude holds a persistent idle assertion and Claude Code spawns
+    /// `caffeinate -i -t 300` per command, so Lidwing would have refused to arm every single
+    /// time, forever.
+    ///
+    /// An idle assertion cannot stop a lid close. Clamshell sleep is a *demand* sleep, and only
+    /// idle sleep can be vetoed by an assertion - which is precisely why this product needs
+    /// selector 12 rather than an assertion of its own. So another app holding one is not doing
+    /// Lidwing's job, and must not stop Lidwing doing it.
+    func testAnotherAppsIdleAssertionDoesNotStopLidwingArming() {
         let (system, _, _, _, machine) = TestFixture.harness()
-        system.foreignAssertionHolders = [ForeignHolder(pid: 812, name: "Amphetamine")]
+        system.foreignAssertionHolders = [
+            ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep),
+            ForeignHolder(pid: 47116, name: "caffeinate", kind: .idleSleep, isTransient: true)
+        ]
 
         let effects = machine.handle(.userArm)
-        XCTAssertEqual(effects,
-                       [.refuseArm(.foreignHolder(ForeignHolder(pid: 812, name: "Amphetamine")),
-                                   .askNow)])
-        XCTAssertEqual(machine.state, .idle)
+
+        XCTAssertEqual(machine.state, .arming, "refused to arm on an ordinary developer Mac")
+        XCTAssertFalse(effects.contains { if case .refuseArm = $0 { return true } else { return false } })
+        XCTAssertEqual(system.lastClamshellWrite, true)
     }
 
+    /// Nor does a stronger one. Lidwing's mechanism is a separate kernel mask that it sets and
+    /// clears itself, so there is nothing to fight over - and the user's agent run should not
+    /// die because Internet Sharing happens to be on.
+    func testAStrongerForeignHoldAlsoDoesNotStopArming() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.foreignAssertionHolders = [
+            ForeignHolder(pid: 366, name: "Internet Sharing", kind: .systemSleep)
+        ]
+
+        machine.handle(.userArm)
+
+        XCTAssertEqual(machine.state, .arming)
+    }
     func testArmRefusedBelowTheBatteryFloor() {
         let (system, _, _, _, machine) = TestFixture.harness()
         system.batteryCurrent = 900        // 18 %
@@ -557,23 +584,22 @@ final class StateMachineTests: XCTestCase {
         }
     }
 
-    /// A Mac that another tool is holding awake: Lidwing stands down and says who, rather than
-    /// fighting for a global bit or claiming a protection it is not providing.
-    func testItStandsDownAtLaunchWhenSomethingElseHoldsTheMac() {
-        let (system, _, _, watchdog, machine) = TestFixture.harness()
-        system.foreignAssertionHolders = [ForeignHolder(pid: 812, name: "caffeinate")]
+    /// A Mac that another tool is holding awake: Lidwing arms anyway and *says who*. Standing
+    /// down would mean the machine this product was built for is the one machine it never works
+    /// on. Decision 0013.
+    func testItStillArmsAtLaunchWhenSomethingElseHoldsTheMac() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.foreignAssertionHolders = [
+            ForeignHolder(pid: 47116, name: "caffeinate", kind: .idleSleep, isTransient: true)
+        ]
         machine.handle(.launch)
 
-        let effects = machine.handle(.armAtLaunch)
+        machine.handle(.armAtLaunch)
 
-        XCTAssertEqual(effects,
-                       [.refuseArm(.foreignHolder(ForeignHolder(pid: 812, name: "caffeinate")),
-                                   .quietly)])
-        XCTAssertEqual(machine.state, .idle)
-        XCTAssertTrue(system.clamshellWrites.isEmpty, "fought another tool for a global bit")
-        XCTAssertEqual(watchdog.connectAttempts, 0)
+        XCTAssertEqual(machine.state, .arming,
+                       "a caffeinate that releases itself in four minutes stopped the product")
+        XCTAssertEqual(system.lastClamshellWrite, true)
     }
-
     /// Launching on a machine somebody else armed must not quietly arm on top of it.
     func testItDoesNotArmItselfIntoARepairState() {
         let (system, _, _, _, machine) = TestFixture.harness()

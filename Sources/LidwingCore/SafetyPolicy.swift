@@ -234,7 +234,18 @@ public struct SafetyPolicy: Sendable {
             }
         }
         if settings.thermalGuardEnabled && thermal == .critical { return .tooHot }
-        if let holder = foreignHolders.first { return .foreignHolder(holder) }
+        // Deliberately **not** a refusal any more. See decision 0013.
+        //
+        // Another app's power assertion does not do Lidwing's job. `StateMachine` puts it in one
+        // line: clamshell sleep is a *demand* sleep, and only idle sleep can be vetoed by an
+        // assertion. That is the whole reason this product needs selector 12 rather than an
+        // assertion alone - so a machine where Claude and three `caffeinate` processes are
+        // holding idle assertions is a machine that still sleeps the moment the lid shuts.
+        //
+        // Refusing there meant Lidwing never armed on exactly the machines it was built for: a
+        // developer Mac running an agent spawns `caffeinate -i -t 300` per command. The holders
+        // are reported in the menu, by name, which is what the user actually needs.
+        _ = foreignHolders
         return nil
     }
 }

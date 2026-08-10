@@ -580,6 +580,33 @@ to be a deliberate decision somebody defends.
 
 ---
 
+## Round 12 — 2026-08-10, a real machine's power assertions
+
+Scope: what Lidwing would actually do on the owner's Mac, given its real `pmset -g assertions`
+output rather than a fixture written to match the code.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 12.1 | **It would never have armed on the machine it was built for.** `SafetyPolicy` refused whenever any process held a sleep assertion, and `foreignHolders` counted `PreventUserIdleSystemSleep` and `NoIdleSleepAssertion` as blocking. On a developer Mac: `Claude` holds one permanently, and Claude Code respawns `caffeinate -i -t 300` per command. After decision 0012 made it arm at launch, it would have refused silently at every login. | **Critical** | Another app's assertion is reported, never a refusal. Decision 0013. |
+
+The reason it was wrong is not that it was inconvenient. `StateMachine` already carried the
+answer in a comment written long before: *clamshell sleep is a demand sleep and only idle sleep
+can be vetoed*. An idle assertion cannot stop a lid close - that is precisely why this product
+needs selector 12 rather than an assertion of its own - so standing down for one protects nothing
+and simply lets the Mac sleep and the agent run die.
+
+Detection got stronger rather than weaker: holders are classified by what they actually prevent,
+named the way a person would recognise them (`configd` becomes `Internet Sharing`), and a
+self-releasing hold is described as brief so the user is not sent hunting for a process that
+stops existing while they look.
+
+**Round 12 verdict:** one critical defect, shipped in v0.1.0 through v0.1.2, found only because
+the owner sent the output of a real machine instead of letting me invent one.
+
+---
+
 ## Round 11 — 2026-08-10, auditing the change I had just made
 
 Scope: arming at launch, an hour old, already green and already pushed.

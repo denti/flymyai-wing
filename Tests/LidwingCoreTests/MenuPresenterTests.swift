@@ -65,7 +65,7 @@ final class MenuPresenterTests: XCTestCase {
         let content = MenuPresenter.content(
             for: snapshot(state: .idle, holder: ForeignHolder(pid: 812, name: "Amphetamine")))
         XCTAssertEqual(content.headline, "Another app is keeping this Mac awake")
-        XCTAssertEqual(content.detail, "Amphetamine (pid 812) - Lidwing stood down.")
+        XCTAssertEqual(content.detail, "Amphetamine is also holding this Mac awake.")
     }
 
     func testNoLidIsHiddenNotMerelyDisabled() {
@@ -234,5 +234,64 @@ final class ToolTipTests: XCTestCase {
         let foreign = MenuPresenter.toolTip(
             for: snapshot(state: .idle, holder: ForeignHolder(pid: 42, name: "caffeinate")))
         XCTAssertNotEqual(plain, foreign)
+    }
+}
+
+/// Naming the other holder, in every state. Decision 0013 turned this from an excuse for
+/// standing down into information a user can act on, because Lidwing no longer stands down.
+final class ConflictLineTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_786_500_000)
+
+    private func armed(with holder: ForeignHolder?, battery: Int = 61,
+                       thermal: ThermalState = .nominal) -> MenuPresenter.Content {
+        MenuPresenter.content(for: MenuPresenter.Snapshot(
+            state: .armed, armedSince: now.addingTimeInterval(-600), now: now,
+            batteryPercent: battery, onAC: false, thermal: thermal, floorPercent: 20,
+            remainingSeconds: 3600, lastFailureAt: nil, foreignHolder: holder,
+            agentRunning: nil))
+    }
+
+    /// The line that used to say "Lidwing stood down" while Lidwing was, in fact, protecting.
+    func testAnIdleHolderIsNamedWithoutClaimingLidwingGaveUp() {
+        let detail = armed(with: ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep)).detail
+        XCTAssertEqual(detail?.contains("Claude"), true)
+        XCTAssertEqual(detail?.lowercased().contains("stood down"), false,
+                       "claimed Lidwing gave up while it was protecting")
+    }
+
+    /// `caffeinate -t 300` is respawned per command. Sending the user to hunt for something that
+    /// stops existing while they look is worse than saying nothing.
+    func testASelfReleasingHolderSaysSo() {
+        let detail = armed(with: ForeignHolder(pid: 47116, name: "caffeinate",
+                                               kind: .idleSleep, isTransient: true)).detail
+        XCTAssertEqual(detail?.contains("caffeinate"), true)
+        XCTAssertEqual(detail?.contains("briefly"), true, detail ?? "nil")
+    }
+
+    /// A system-sleep hold really is doing the job on its own, and says so differently.
+    func testAStrongHolderIsDescribedDifferently() {
+        let strong = armed(with: ForeignHolder(pid: 366, name: "Internet Sharing",
+                                               kind: .systemSleep)).detail
+        let idle = armed(with: ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep)).detail
+        XCTAssertNotEqual(strong, idle)
+        XCTAssertEqual(strong?.contains("on its own"), true, strong ?? "nil")
+    }
+
+    /// Conflict is a headline fact, not a fallback. A battery or thermal warning already owns
+    /// the detail line in these states, and the other holder must not vanish behind it.
+    func testTheHolderIsStillNamedWhenAGuardOwnsTheDetailLine() {
+        let hot = armed(with: ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep),
+                        thermal: .serious)
+        XCTAssertEqual(hot.detail?.contains("Claude"), true,
+                       "the other holder disappeared behind a thermal warning: \(hot.detail ?? "nil")")
+
+        let low = armed(with: ForeignHolder(pid: 41846, name: "Claude", kind: .idleSleep),
+                        battery: 22)
+        XCTAssertEqual(low.detail?.contains("Claude"), true,
+                       "the other holder disappeared behind a battery warning: \(low.detail ?? "nil")")
+    }
+
+    func testNothingIsSaidWhenNobodyElseHoldsIt() {
+        XCTAssertEqual(armed(with: nil).detail?.contains("holding"), false)
     }
 }

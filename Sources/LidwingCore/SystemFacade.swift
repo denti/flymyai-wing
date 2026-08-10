@@ -49,10 +49,18 @@ public enum MechanismError: Equatable, Error, Sendable {
 public struct ForeignHolder: Equatable, Sendable {
     public let pid: Int32
     public let name: String
+    /// What this hold actually prevents. Load-bearing: an idle-sleep assertion cannot stop a
+    /// lid close, so its holder is not doing Lidwing's job and must not stop Lidwing doing it.
+    public let kind: PowerAssertions.Kind
+    /// True when the holder declared it will release itself shortly - `caffeinate -t 300` does.
+    public let isTransient: Bool
 
-    public init(pid: Int32, name: String) {
+    public init(pid: Int32, name: String,
+                kind: PowerAssertions.Kind = .idleSleep, isTransient: Bool = false) {
         self.pid = pid
         self.name = name
+        self.kind = kind
+        self.isTransient = isTransient
     }
 }
 

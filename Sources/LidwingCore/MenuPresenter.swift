@@ -155,6 +155,12 @@ public struct MenuPresenter {
                 detail = foreignDetail(holder)
             }
         }
+        // Conflict is a headline fact, not a fallback. If a guard already claimed the detail
+        // line, the other holder still gets named rather than being hidden behind it.
+        if let holder = snapshot.foreignHolder, let existing = detail,
+           !existing.contains(holder.name) {
+            detail = existing + " " + foreignDetail(holder)
+        }
         if let elapsed = snapshot.armedSince.map({ snapshot.now.timeIntervalSince($0) }) {
             accessibility += ", \(spokenDuration(Int(elapsed))) so far"
         }
@@ -163,9 +169,27 @@ public struct MenuPresenter {
                        accessibilityValue: accessibility)
     }
 
-    private static func foreignDetail(_ holder: ForeignHolder) -> String {
-        Strings.text("menu.foreign.detail", "%1$@ (pid %2$lld) - Lidwing stood down.",
-                     holder.name, Int64(holder.pid))
+    /// Names the other holder, in every state, because that is the fact the user needs.
+    ///
+    /// It used to end "Lidwing stood down", which stopped being true in decision 0013: an idle
+    /// assertion cannot stop a lid close, so another app holding one is not doing this job and
+    /// Lidwing arms anyway. The line is now information rather than an excuse.
+    ///
+    /// A holder that releases itself is named as such. `caffeinate -t 300` is respawned per
+    /// command by Claude Code, and a user reading "caffeinate is keeping this Mac awake" with no
+    /// further qualification would go looking for something to switch off that stops existing
+    /// while they look for it.
+    static func foreignDetail(_ holder: ForeignHolder) -> String {
+        if holder.isTransient {
+            return Strings.text("menu.foreign.transient",
+                                "%1$@ is also holding it awake, briefly.", holder.name)
+        }
+        if holder.kind == .systemSleep {
+            return Strings.text("menu.foreign.strong",
+                                "%1$@ is holding this Mac awake on its own.", holder.name)
+        }
+        return Strings.text("menu.foreign.detail", "%1$@ is also holding this Mac awake.",
+                            holder.name)
     }
 
     private static func power(_ snapshot: Snapshot) -> String? {
