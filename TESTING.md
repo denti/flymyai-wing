@@ -87,7 +87,48 @@ weaker test would have skipped over.
 
 ---
 
-## 3. Static gates
+## 3. The notify helper, measured
+
+`lidwing-notify` runs inside somebody else's tool, on their critical path, possibly hundreds of
+times a session. Its contract is about **timing and exit codes**, which no test of the
+surrounding Swift can check — so it is tested by running it. It is plain POSIX C, so this runs
+on Linux as well as macOS and is part of the ordinary pre-push gate.
+
+| | |
+|---|---|
+| Command | `./Scripts/test-notify-helper.sh` |
+| Assertions | **15**, 0 failed |
+| Binary size | **12 528 bytes** |
+| Warnings | none, at `-Wall -Wextra -Werror` |
+| **Time with no listener** | **4 ms** (budget 150 ms) |
+
+The no-listener case is the one that happens most, because the app usually is not running. Exit
+code 2 is a *blocking* error in Claude Code and would stall the user's agent, so the only
+acceptable answer is `0`, fast. Also asserted: a 20 KB payload, binary input, and an unset
+`HOME` all still exit 0; the chained command really does run, with its own argument; and the
+message is one newline-terminated version-tagged line.
+
+### The defect it found
+
+The helper read stdin non-blockingly. The caller writes the payload to a pipe and the helper can
+start first, so the read returned `EAGAIN` and **silently lost the body** — the notification then
+arrived empty, looking as though the agent had nothing to say.
+
+The first version of the test could not tell the two implementations apart, because on this
+machine the shell happened to write before the child ran. Making the race deterministic (delay
+the write by 50 ms) turns it into a real positive control:
+
+```
+with select():        ok    a payload written 50ms late still arrives      SUMMARY pass=15 fail=0
+with non-blocking:    FAIL  lost a payload ... {"v":1,"src":"claude","body":""}   pass=14 fail=1
+```
+
+`select` with the same 100 ms budget keeps the hard bound on how long the helper can cost the
+user's agent, and actually gets the data.
+
+---
+
+## 4. Static gates
 
 | Gate | Command | Result | Positive control |
 |---|---|---|---|
@@ -136,7 +177,7 @@ until the Developer ID exists, and `INSTALL.md` says exactly what that costs a u
 
 ---
 
-## 4. Load and stress
+## 5. Load and stress
 
 | Test | Scale | Result |
 |---|---|---|
@@ -149,7 +190,7 @@ reproduces exactly rather than "sometimes".
 
 ---
 
-## 5. What none of this proves, and where it will be proved
+## 6. What none of this proves, and where it will be proved
 
 CI has no lid, no battery, no real power events and no Aqua session. In particular:
 
@@ -167,7 +208,7 @@ expected observation. None of them is claimed here until it has been run.
 
 ---
 
-## 6. Still to build
+## 7. Still to build
 
 Named so that their absence is visible rather than implied:
 
@@ -183,7 +224,7 @@ Named so that their absence is visible rather than implied:
 
 ---
 
-## 7. Failures this regime has already caught
+## 8. Failures this regime has already caught
 
 Recorded because a test regime's value is what it stopped, not what it asserts.
 
@@ -193,3 +234,4 @@ Recorded because a test regime's value is what it stopped, not what it asserts.
 | The CI test-count assertion read the **first** `Executed N tests` line | It asserted on 13 tests out of 79 — a suite could have lost 80 % of its coverage and still passed the guard that exists to prevent exactly that | reading the log rather than the exit code |
 | `IOPMCopyAssertionsByProcess()` used as if it returned a dictionary | It answers through an out-parameter. The idle-assertion verification would not have compiled — but the same shape of mistake in a function that *does* return an optional would have silently reported "we hold no assertion" forever | the macOS compiler in CI |
 | `wingprobe disarm` called `arm()` on its way to disarming | The safety valve, the command a user runs when they think their Mac is stuck awake, would have **armed** it | reading the code back before shipping it |
+| `lidwing-notify` read stdin non-blockingly | Every notification from Claude Code would have arrived with an empty body, looking like the agent had nothing to say | running the binary, then making the race deterministic so the test could tell the two versions apart |

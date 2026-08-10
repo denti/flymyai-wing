@@ -45,6 +45,10 @@ if [ "$COUNT" -lt 40 ]; then
   FAIL=1
 fi
 
+echo "== notify helper"
+docker run --rm -v "$PWD":/src -w /src -u "$(id -u):$(id -g)" -e HOME=/tmp "$DOCKER_SWIFT" \
+  ./Scripts/test-notify-helper.sh | tail -1 || FAIL=1
+
 echo "== lint (strict)"
 docker run --rm -v "$PWD":/work -w /work "$DOCKER_LINT" swiftlint lint --strict --reporter emoji \
   | tail -1 || FAIL=1

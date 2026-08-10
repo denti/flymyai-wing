@@ -123,16 +123,25 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Claude Code delivers the payload on stdin; Codex passes it as argv[1]. Reading stdin
-     * must never block: if nothing is there, we move on. */
+    /* Claude Code delivers the payload on stdin; Codex passes it as argv[1].
+     *
+     * `select` with a budget rather than a non-blocking read: the caller writes to the pipe and
+     * a non-blocking read races it, returning EAGAIN and silently losing the payload, so the
+     * notification arrives with no body. Waiting up to BUDGET_MS keeps the same hard bound on
+     * how long we can cost the user's agent, and actually gets the data. */
     if (body == NULL) {
-        ssize_t got;
-        int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-        if (flags >= 0) (void)fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-        got = read(STDIN_FILENO, stdin_buffer, sizeof(stdin_buffer) - 1);
-        if (got > 0) {
-            stdin_buffer[got] = '\0';
-            body = stdin_buffer;
+        fd_set readable;
+        struct timeval timeout;
+        FD_ZERO(&readable);
+        FD_SET(STDIN_FILENO, &readable);
+        timeout.tv_sec = 0;
+        timeout.tv_usec = BUDGET_MS * 1000;
+        if (select(STDIN_FILENO + 1, &readable, NULL, NULL, &timeout) > 0) {
+            ssize_t got = read(STDIN_FILENO, stdin_buffer, sizeof(stdin_buffer) - 1);
+            if (got > 0) {
+                stdin_buffer[got] = '\0';
+                body = stdin_buffer;
+            }
         }
     }
 

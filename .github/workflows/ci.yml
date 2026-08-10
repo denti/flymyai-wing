@@ -48,6 +48,11 @@ jobs:
           COUNT=$(grep -Eo 'Executed [0-9]+ tests' linux-test.log | tail -1 | grep -Eo '[0-9]+')
           echo "collected $COUNT tests"
           test "$COUNT" -ge 40
+      # The hook helper's contract is about timing and exit codes, which no Swift test can
+      # check. It is plain POSIX C, so it runs here rather than waiting for a macOS runner.
+      - name: Notify-helper behaviour
+        shell: bash
+        run: ./Scripts/test-notify-helper.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
         if: always()
         with:
@@ -85,6 +90,10 @@ jobs:
         run: swift build -Xswiftc -warnings-as-errors
       - name: Unit tests
         run: swift test 2>&1 | tee macos-test.log
+      # Also run on macOS: this is the platform the helper actually ships to, and the timing
+      # budget is about a real user's agent rather than a container.
+      - name: Notify-helper behaviour
+        run: ./Scripts/test-notify-helper.sh
       - name: Assert the tests actually ran
         run: |
           set -euo pipefail
