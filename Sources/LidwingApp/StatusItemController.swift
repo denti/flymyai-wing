@@ -32,6 +32,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
         statusItem.button?.setAccessibilityLabel("Lidwing")
 
+        // Display accommodations are read live, never once at launch. `refresh()` consults
+        // Increase Contrast every time it runs, but it only runs when the state changes — and
+        // this app's whole design is that the state does not change while nothing is happening.
+        // Without this subscription, a user who turns Increase Contrast on while Lidwing sits
+        // idle keeps the dimmed glyph for the rest of the session, which is exactly the cue the
+        // accommodation exists to restore.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(displayAccommodationsChanged),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil)
+
         // Once, ever, and 400 ms after the item exists so it does not race the menu bar's own
         // layout. Nothing else happens at launch.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
@@ -39,7 +51,18 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
     // MARK: appearance
+
+    @objc private func displayAccommodationsChanged() {
+        // The notification arrives on the main thread, but say so rather than trust it: every
+        // other callback in this product hops explicitly, and an AppKit mutation from anywhere
+        // else is a crash the user reports and I cannot reproduce.
+        DispatchQueue.main.async { [weak self] in self?.refresh() }
+    }
 
     func refresh() {
         let snapshot = coordinator.snapshot()
@@ -56,7 +79,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         button.appearsDisabled = (shape == .unsupported) && !increaseContrast
 
-        button.toolTip = content.headline
+        button.toolTip = MenuPresenter.toolTip(for: snapshot)
         button.setAccessibilityValue(content.accessibilityValue)
         // Without this the value is readable if a VoiceOver user happens to navigate there,
         // but never announced — which defeats the point for an app whose state changes while
@@ -64,8 +87,20 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSAccessibility.post(element: button, notification: .valueChanged)
     }
 
+    /// Points at the status item for a user who relaunched from Finder and cannot find it.
     func flash() {
         guard let button = statusItem.button else { return }
+
+        // Reduce Motion does not mean "give this user no feedback"; it means "do not move".
+        // Blinking six times at 4 Hz is precisely what the accommodation is for, so under it
+        // the item highlights once and holds, then clears. The user is still shown where the
+        // icon is - which is the entire purpose - without anything oscillating.
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            button.highlight(true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { button.highlight(false) }
+            return
+        }
+
         var count = 0
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now(), repeating: 0.25)

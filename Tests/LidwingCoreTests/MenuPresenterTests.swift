@@ -148,3 +148,91 @@ final class RecoveredFailureTests: XCTestCase {
         XCTAssertTrue(content.headline.contains("slept"), content.headline)
     }
 }
+
+/// The status item's tooltip.
+///
+/// It used to be the menu headline, which restated the state the glyph already carries. These
+/// tests hold it to the two rules the craft spec gives, because both are the kind of thing that
+/// rots one careless string at a time and nobody notices until a screenshot review.
+final class ToolTipTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_786_500_000)
+
+    private func snapshot(state: LidwingState,
+                          holder: ForeignHolder? = nil,
+                          agent: String? = nil,
+                          sleeps: Int = 0) -> MenuPresenter.Snapshot {
+        MenuPresenter.Snapshot(state: state, armedSince: now.addingTimeInterval(-3600), now: now,
+                               batteryPercent: 61, onAC: false, thermal: .nominal,
+                               floorPercent: 20, remainingSeconds: 7200,
+                               lastFailureAt: nil, foreignHolder: holder,
+                               agentRunning: agent, sleepsObserved: sleeps)
+    }
+
+    private let everyState: [LidwingState] =
+        [.unsupported, .idle, .arming, .armed, .degraded, .disarming, .failed, .repair]
+
+    func testEveryStateHasATip() {
+        for state in everyState {
+            let tip = MenuPresenter.toolTip(for: snapshot(state: state))
+            XCTAssertFalse(tip.isEmpty, "\(state) has no tooltip")
+        }
+    }
+
+    /// A tooltip that ends in a period reads as a sentence fragment pretending to be prose.
+    func testNoTipEndsInAPeriod() {
+        for state in everyState {
+            let tip = MenuPresenter.toolTip(for: snapshot(state: state))
+            XCTAssertFalse(tip.hasSuffix("."), "\(state): \"\(tip)\" ends in a period")
+        }
+    }
+
+    /// The rule that actually carries the value: a tooltip appears before the click, so it says
+    /// what will happen. Restating the state is what the glyph and the spoken value already do.
+    func testTipsDoNotMerelyRestateTheState() {
+        for state in everyState {
+            let tip = MenuPresenter.toolTip(for: snapshot(state: state))
+            let headline = MenuPresenter.content(for: snapshot(state: state)).headline
+            XCTAssertNotEqual(tip, headline,
+                              "\(state): the tooltip is just the menu headline again")
+        }
+    }
+
+    /// Em and en dashes are forbidden everywhere in this product's copy; the tooltips were
+    /// written after that rule and are the most likely place to forget it.
+    func testNoFancyDashes() {
+        for state in everyState {
+            let tip = MenuPresenter.toolTip(for: snapshot(state: state))
+            XCTAssertFalse(tip.contains("\u{2014}") || tip.contains("\u{2013}"),
+                           "\(state): \"\(tip)\" contains an em or en dash")
+        }
+    }
+
+    /// `.degraded` is still protecting, so it is easy to give it the calm text and lose the
+    /// only signal that something is wrong.
+    func testDegradedDoesNotReadLikeAHealthyArmedMac() {
+        let calm = MenuPresenter.toolTip(for: snapshot(state: .armed))
+        let degraded = MenuPresenter.toolTip(for: snapshot(state: .degraded))
+        XCTAssertNotEqual(calm, degraded)
+    }
+
+    func testTheTipNamesTheAgentThatIsRunning() {
+        let tip = MenuPresenter.toolTip(for: snapshot(state: .armed, agent: "claude"))
+        XCTAssertTrue(tip.contains("claude"), tip)
+    }
+
+    /// A Mac that slept while armed is the one failure this product exists to prevent. The
+    /// tooltip must not go on quietly claiming everything is fine.
+    func testASleptMacIsVisibleInTheTip() {
+        let calm = MenuPresenter.toolTip(for: snapshot(state: .armed))
+        let slept = MenuPresenter.toolTip(for: snapshot(state: .armed, sleeps: 1))
+        XCTAssertNotEqual(calm, slept, "a Mac that slept while armed reads as an ordinary armed Mac")
+        XCTAssertTrue(slept.lowercased().contains("slept"), slept)
+    }
+
+    func testAForeignHolderIsNotDescribedAsMerelyOff() {
+        let plain = MenuPresenter.toolTip(for: snapshot(state: .idle))
+        let foreign = MenuPresenter.toolTip(
+            for: snapshot(state: .idle, holder: ForeignHolder(pid: 42, name: "caffeinate")))
+        XCTAssertNotEqual(plain, foreign)
+    }
+}

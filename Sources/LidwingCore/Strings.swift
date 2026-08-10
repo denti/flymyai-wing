@@ -50,6 +50,32 @@ public struct StringEntry: Equatable, Sendable {
 /// way that cannot be translated.
 public enum StringKey {
     public static let all: [StringEntry] = [
+        // Status-item tooltips. Shown on hover, before any click, so each says what will
+        // happen rather than restating the state the glyph already carries. Verb first, no
+        // ending period.
+        StringEntry("tip.off", "Turn on to keep this Mac awake with the lid closed",
+         "Tooltip on the menu bar icon while Lidwing is off. Verb first, no ending period."),
+        StringEntry("tip.on", "Keeping this Mac awake with the lid closed",
+         "Tooltip while protection is active. No ending period."),
+        StringEntry("tip.agent", "Keeping this Mac awake - %1$@ is running",
+         "%1$@ is a coding-agent binary name such as claude or codex. No ending period."),
+        StringEntry("tip.degraded", "Keeping this Mac awake - click, a guard is warning",
+         "Tooltip while still protecting but a battery or heat guard is warning."),
+        StringEntry("tip.nolid", "Close the lid freely - this Mac has none to sleep on",
+         "Tooltip on a Mac with no lid, such as a Mac mini or a Mac Studio."),
+        StringEntry("tip.repair", "Click to release whatever is keeping this Mac awake",
+         "Tooltip when a leftover sleep override was found at launch."),
+        StringEntry("tip.failed", "Click for details - this Mac is not protected",
+         "Tooltip after protection failed. Must not sound reassuring."),
+        StringEntry("tip.foreign", "Another app is already keeping this Mac awake",
+         "Tooltip when a different app holds the sleep override and Lidwing stood down."),
+        StringEntry("tip.arming", "Checking that the lid setting took effect",
+         "Tooltip while verifying, before Lidwing claims to be on."),
+        StringEntry("tip.disarming", "Letting this Mac sleep normally again",
+         "Tooltip while releasing the override."),
+        StringEntry("tip.slept", "Click for details - this Mac slept while protected",
+         "Tooltip after the machine slept despite protection. The one failure that matters."),
+
         // Menu — the entire visible surface of the product.
         StringEntry("menu.toggle", "Keep Awake with the Lid Closed",
          "The one command in the menu. Title case."),

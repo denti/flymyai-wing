@@ -197,6 +197,48 @@ public struct MenuPresenter {
         return "\(total)s"
     }
 
+    /// The status item's tooltip.
+    ///
+    /// Deliberately not the menu headline, which is what this used to be. The headline restates
+    /// the state - but a tooltip appears on hover, *before* the click, and the state is already
+    /// carried twice over by the glyph and by `accessibilityValue`. Saying "Off" a third time to
+    /// someone who has paused their pointer over an unfamiliar icon tells them nothing they can
+    /// act on. So each tooltip says what will happen, verb first, with no ending period.
+    public static func toolTip(for snapshot: Snapshot) -> String {
+        switch snapshot.state {
+        case .unsupported:
+            return Strings.text("tip.nolid", "Close the lid freely - this Mac has none to sleep on")
+        case .repair:
+            return Strings.text("tip.repair", "Click to release whatever is keeping this Mac awake")
+        case .failed:
+            return Strings.text("tip.failed", "Click for details - this Mac is not protected")
+        case .idle:
+            if snapshot.foreignHolder != nil {
+                return Strings.text("tip.foreign", "Another app is already keeping this Mac awake")
+            }
+            return Strings.text("tip.off", "Turn on to keep this Mac awake with the lid closed")
+        case .arming:
+            return Strings.text("tip.arming", "Checking that the lid setting took effect")
+        case .disarming:
+            return Strings.text("tip.disarming", "Letting this Mac sleep normally again")
+        case .armed, .degraded:
+            if snapshot.sleepsObserved > 0 {
+                return Strings.text("tip.slept", "Click for details - this Mac slept while protected")
+            }
+            // `.degraded` is still protecting, which is why it shares this branch - but a
+            // guard is warning, and a tooltip that reads exactly like the calm state hides the
+            // one piece of information that would make a user look.
+            if snapshot.state == .degraded {
+                return Strings.text("tip.degraded",
+                                    "Keeping this Mac awake - click, a guard is warning")
+            }
+            if let agent = snapshot.agentRunning {
+                return Strings.text("tip.agent", "Keeping this Mac awake - %1$@ is running", agent)
+            }
+            return Strings.text("tip.on", "Keeping this Mac awake with the lid closed")
+        }
+    }
+
     /// VoiceOver reads "7h" as "seven aitch". Spell it.
     public static func spokenDuration(_ seconds: Int) -> String {
         let total = max(0, seconds)

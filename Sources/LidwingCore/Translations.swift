@@ -45,6 +45,20 @@ public enum Translations {
     // the user needs to know the Mac will go to sleep and the run will stop.
 
     static let russian: [String: String] = [
+        // Tooltips. Verb first and no ending period, like the English ones: they say what will
+        // happen if you click, not what is already true.
+        "tip.off": "Включите, чтобы Mac не засыпал с закрытой крышкой",
+        "tip.on": "Не даёт этому Mac уснуть с закрытой крышкой",
+        "tip.agent": "Не даёт этому Mac уснуть - работает %1$@",
+        "tip.degraded": "Не даёт этому Mac уснуть - нажмите, есть предупреждение",
+        "tip.nolid": "Крышку можно закрывать свободно - у этого Mac её нет",
+        "tip.repair": "Нажмите, чтобы снять то, что не даёт Mac уснуть",
+        "tip.failed": "Нажмите за подробностями - защиты сейчас нет",
+        "tip.foreign": "Другое приложение уже не даёт этому Mac уснуть",
+        "tip.arming": "Проверяем, что настройка крышки сработала",
+        "tip.disarming": "Возвращаем обычный сон",
+        "tip.slept": "Нажмите за подробностями - Mac уснул во время защиты",
+
         "menu.toggle": "Не спать с закрытой крышкой",
         "menu.off": "Выключено - Mac засыпает как обычно",
         "menu.awake": "Не спит - можно закрывать крышку",
