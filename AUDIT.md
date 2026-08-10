@@ -313,3 +313,58 @@ protecting.
 **Round 6 verdict:** one medium defect from reading the code against the specification rather
 than against itself — the specification described a state, *no lid*, that the code had a name
 for and no path to — plus two more from walking the same file's error paths.
+
+
+---
+
+## Round 7 — 2026-08-10, a test that hung instead of failing
+
+Not a planned round. The macOS CI job stopped making progress on the step that runs the
+notify-helper tests, and a job that hangs is the worst possible outcome: it burns to its timeout
+and reports nothing at all.
+
+### The finding
+
+**`sun_path` is 104 bytes on macOS, and the test's socket path did not fit.**
+
+The socket lives at `$HOME/Library/Application Support/Lidwing/notify.sock` — forty-five
+characters before the home directory even begins. The test set `HOME` to `mktemp -d`, which on
+macOS returns something like `/var/folders/xx/…/T/tmp.XXXXXXXX`, and the total blew the limit.
+
+The failure mode is the interesting part, because the two sides disagreed **silently and in
+opposite directions**:
+
+* the listener used `strncpy` into `sun_path`, which **truncates**, so it bound to a different
+  address than the one it was asked for and waited for a client there;
+* `lidwing-notify` checks the length and **declines to connect** — correctly — so no client ever
+  arrived;
+* `accept()` blocked forever, and the CI job sat there until its timeout.
+
+On Linux the limit is 108 and the same path fitted, which is why it passed locally every time.
+
+Fixed three ways, because any one of them alone leaves the trap set for the next person:
+
+1. The test uses a short working directory (`/tmp/lw$$`) and **prints the path length in every
+   run**, so the constraint is visible rather than remembered.
+2. The listener **refuses** a path that would be truncated instead of binding to a different
+   address.
+3. The listener sets a ten-second `alarm`, so a hang becomes a reported failure.
+
+Positive controls for all three, run with a deliberately over-long path:
+
+```
+note  socket path is 114 chars (sun_path holds 103 on macOS, 107 on Linux)
+FAIL  the socket path is too long for macOS - this test would hang there
+FAIL  the socket path was too long for sun_path
+SUMMARY pass=9 fail=4
+```
+
+### The rule
+
+*Empty is not success* has a sibling: **a hang is not a pass, and it is worse than a failure.**
+Anything in this project that waits on another process now has a deadline, because the failure
+mode without one is a green-looking job that never finished and a person who has to guess why.
+
+**Round 7 verdict:** one defect in the test infrastructure, found by CI behaving oddly rather
+than by CI going red — and it was only ever going to appear on the platform the product
+actually ships to.

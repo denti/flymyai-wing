@@ -15,7 +15,15 @@
 set -u -o pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="$(mktemp -d)"
+
+# A short path on purpose. `sun_path` in `sockaddr_un` is 104 bytes on macOS, and the socket
+# lives at $HOME/Library/Application Support/Lidwing/notify.sock — 45 characters before the
+# home directory even starts. macOS's `mktemp -d` returns something like
+# /var/folders/xx/…/T/tmp.XXXXXXXX, which blows the limit, and the failure is silent
+# truncation on one side and a refusal on the other: the helper declines to connect and the
+# listener waits for a client that will never arrive.
+WORK="/tmp/lw$$"
+mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
 
 PASS=0
@@ -80,6 +88,10 @@ fi
 # ------------------------------------------------------------------ a listener that is there
 
 SOCKET="$WORK/Library/Application Support/Lidwing/notify.sock"
+echo "  note  socket path is ${#SOCKET} chars (sun_path holds 103 on macOS, 107 on Linux)"
+if [ "${#SOCKET}" -ge 103 ]; then
+  bad "the socket path is too long for macOS - this test would hang there"
+fi
 RECEIVED="$WORK/received.txt"
 
 # A listener in C rather than in Python: the Swift container has a compiler and no python3,
@@ -89,8 +101,15 @@ cat > "$WORK/listener.c" <<'CSRC'
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+
+/* A hang is worse than a failure: it burns a CI job to its timeout and reports nothing. */
+static void give_up(int signal_number) {
+    (void)signal_number;
+    _exit(7);
+}
 
 int main(int argc, char **argv) {
     struct sockaddr_un address;
@@ -100,6 +119,15 @@ int main(int argc, char **argv) {
     FILE *out;
 
     if (argc < 3) return 2;
+    /* Refuse a path that would be truncated, rather than binding to a different address than
+     * the one we were asked for and waiting forever for a client that cannot find us. */
+    if (strlen(argv[1]) >= sizeof(address.sun_path)) {
+        fprintf(stderr, "socket path too long for sun_path (%zu >= %zu)\n",
+                strlen(argv[1]), sizeof(address.sun_path));
+        return 8;
+    }
+    signal(SIGALRM, give_up);
+    alarm(10);
     unlink(argv[1]);
     server = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server < 0) return 3;
@@ -136,7 +164,10 @@ echo '{"session":"abc","message":"needs permission"}' | "$WORK/lidwing-notify" -
 STATUS=$?
 [ "$STATUS" -eq 0 ] && ok "exits 0 with a listener" || bad "exited $STATUS with a listener"
 
-wait "$LISTENER" 2>/dev/null || true
+wait "$LISTENER" 2>/dev/null
+LISTENER_STATUS=$?
+[ "$LISTENER_STATUS" -eq 7 ] && bad "the listener timed out waiting for a connection"
+[ "$LISTENER_STATUS" -eq 8 ] && bad "the socket path was too long for sun_path"
 
 if [ -s "$RECEIVED" ]; then
   BODY="$(cat "$RECEIVED")"
@@ -184,7 +215,9 @@ for _ in $(seq 1 50); do
 done
 
 ( sleep 0.05; echo '{"delayed":"payload"}' ) | "$WORK/lidwing-notify" --claude
-wait "$SLOW_LISTENER" 2>/dev/null || true
+wait "$SLOW_LISTENER" 2>/dev/null
+SLOW_STATUS=$?
+[ "$SLOW_STATUS" -eq 7 ] && bad "the listener timed out waiting for the delayed payload"
 
 if grep -q "delayed" "$SLOW_RECEIVED" 2>/dev/null; then
   ok "a payload written 50ms late still arrives"
