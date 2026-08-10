@@ -37,8 +37,7 @@ docker run --rm -v "$PWD":/mnt koalaman/shellcheck:stable -S warning \
 echo "== core purity"
 ./Scripts/check-core-purity.sh || FAIL=1
 
-echo "== bundle contract"
-./Scripts/check-bundle-contract.sh || FAIL=1
+./Scripts/check-bundle-contract.sh || FAIL=1   # prints its own header
 
 echo "== build (warnings are errors)"
 run_swift swift build -Xswiftc -warnings-as-errors || FAIL=1

@@ -247,6 +247,45 @@ by a script, and the script says so in every run rather than quietly omitting th
 
 ---
 
+## H8 — Keyboard and VoiceOver · 6 minutes · before the first published build
+
+The one part of this product I cannot check from Linux at all. Every accessibility fix so far
+was made by reading `CRAFT.md` §8 beside the code, and reading found three real gaps — which is
+a good argument for someone actually running it, because reading also missed them for six
+cycles.
+
+**Keyboard** — System Settings ▸ Keyboard ▸ **Full Keyboard Access** on, then:
+
+1. **Control-F8**, arrow to the wing, press **Return**. The menu opens.
+2. Arrow to `Keep Awake with the Lid Closed`, press **Return**. The glyph changes.
+3. Reopen, arrow to `Settings…`, press **Return**.
+4. **Tab** through every control. Each one must show a visible focus ring, and focus must start
+   on the mode control rather than on nothing.
+5. **Escape** dismisses the menu at every level.
+
+**VoiceOver** — **Command-F5** on, then `VO-M` `VO-M-M` to reach the status menus.
+
+- The item announces "Lidwing" and then the state as a sentence, not "seven aitch".
+- Toggle protection with the menu open. The new state should be **announced without navigating
+  back to it** — that is the `.valueChanged` post, and it is the part most likely to be silently
+  wrong.
+- In Settings, every control announces its label **and** its one-line explanation. The battery
+  floor and the duration limit are the two to check first: their help text was missing entirely
+  until cycle 8, because it was attached behind a cast that never matched.
+
+**Display accommodations** — with Lidwing **running and idle**, turn **Increase Contrast** on in
+System Settings ▸ Accessibility ▸ Display. The glyph must stop being dimmed **immediately**,
+without touching Lidwing. Then turn **Reduce Motion** on, quit and relaunch Lidwing from Finder:
+the item should highlight once and hold, not blink.
+
+**Accessibility Inspector** — Xcode ▸ Open Developer Tool ▸ Accessibility Inspector ▸ point at
+the Settings window ▸ **Audit**.
+
+**Send:** the audit's warning count, and a note on any of the steps above that did not do what
+it says. Zero warnings is the target; a contrast failure is a real finding, not a nitpick.
+
+---
+
 *Not on this list, deliberately: buying an Intel MacBook, renting monthly Mac hosting, an AWS
 account, or a crash-reporting plan. None of them is needed, and the reasoning is in
 `ADDENDUM.md` §3.*

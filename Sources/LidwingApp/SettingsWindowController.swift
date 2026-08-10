@@ -59,6 +59,11 @@ final class SettingsWindowController: NSWindowController {
         if window?.frameAutosaveName.isEmpty ?? true { window?.center() }
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        // Open with focus on the first control rather than on nothing. Without this, a Full
+        // Keyboard Access user presses Tab and focus appears somewhere unpredictable, and
+        // VoiceOver announces the window title and then falls silent.
+        window?.initialFirstResponder = modeControl
+        window?.makeFirstResponder(modeControl)
     }
 
     // MARK: content
@@ -208,10 +213,29 @@ final class SettingsWindowController: NSWindowController {
     /// nobody can make an informed decision about.
     private func row(label: String, control: NSView, explanation: String) -> NSView {
         let title = NSTextField(labelWithString: label)
+        // The visible label is a separate text field, so a pop-up reached by Tab or by VoiceOver
+        // announces only its own value - "20 per cent" with no hint of what it governs. The
+        // label has to be on the control itself.
+        control.setAccessibilityLabel(label)
+        // Attach the explanation to the control before wrapping it. This used to wrap first and
+        // attach afterwards, and the attachment was guarded on `as? NSButton`, so a row built
+        // this way handed a stack view to that cast, the cast failed, and the row silently had
+        // no help text and no tooltip at all. The two rows built this way are the battery floor
+        // and the duration limit - the two settings that decide when this Mac is allowed to
+        // stop. Nothing was red; the accommodation was simply absent.
+        attachExplanation(explanation, to: control)
         let line = NSStackView(views: [title, control])
         line.orientation = .horizontal
         line.spacing = 8
         return withExplanation(line, explanation)
+    }
+
+    /// Puts an explanation where both a pointer and VoiceOver can reach it.
+    private func attachExplanation(_ explanation: String, to view: NSView) {
+        // Any control, not only a button: pop-ups and sliders need this at least as much.
+        guard let control = view as? NSControl else { return }
+        control.toolTip = explanation
+        control.setAccessibilityHelp(explanation)
     }
 
     private func withExplanation(_ view: NSView, _ explanation: String) -> NSView {
@@ -220,10 +244,7 @@ final class SettingsWindowController: NSWindowController {
         note.textColor = .secondaryLabelColor
         note.lineBreakMode = .byWordWrapping
         note.preferredMaxLayoutWidth = 400
-        if let control = view as? NSButton {
-            control.toolTip = explanation
-            control.setAccessibilityHelp(explanation)
-        }
+        attachExplanation(explanation, to: view)
         let stack = NSStackView(views: [view, note])
         stack.orientation = .vertical
         stack.alignment = .leading
