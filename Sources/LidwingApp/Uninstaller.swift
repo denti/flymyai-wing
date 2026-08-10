@@ -31,11 +31,34 @@ enum Uninstaller {
                                          : "the machine still reports lid-close sleep disabled",
                              ok: stock)
 
-            case .removeIntegrations, .restoreDisplacedConfiguration:
-                // Nothing is written to a third-party file until the integrations milestone,
-                // so there is nothing to undo. Reported rather than skipped silently: a step
-                // that vanishes from the report is a step nobody notices was never run.
-                outcome.note(step, "nothing was ever written")
+            case .removeIntegrations:
+                // Only our own entries, matched on the bundle-path marker. Every other byte of
+                // somebody else's config file is left exactly as it was.
+                var removed: [String] = []
+                var failed: [String] = []
+                for agent in IntegrationInstaller.Agent.allCases {
+                    do {
+                        if try IntegrationInstaller.uninstall(agent) {
+                            removed.append(agent.displayName)
+                        }
+                    } catch {
+                        failed.append("\(agent.displayName): \(error)")
+                    }
+                }
+                outcome.note(step,
+                             failed.isEmpty
+                                 ? (removed.isEmpty ? "nothing of ours was in any agent config"
+                                                    : "removed from \(removed.joined(separator: ", "))")
+                                 : "could not clean up \(failed.joined(separator: "; "))",
+                             ok: failed.isEmpty)
+
+            case .restoreDisplacedConfiguration:
+                // Codex's `notify` is a single scalar, so ours may have displaced somebody
+                // else's command. `IntegrationInstaller.uninstall` restores it byte for byte
+                // in the same pass as the step above; this reports the outcome rather than
+                // vanishing from the list, because a step nobody sees is a step nobody notices
+                // was never run.
+                outcome.note(step, "the displaced command was put back in the same pass")
 
             case .removeWatchdog:
                 WatchdogInstaller.remove()

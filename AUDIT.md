@@ -178,3 +178,42 @@ press a button that did nothing, which is its own kind of lie.
 **Round 3 verdict:** one high-severity defect, and it was hidden by a mock that flattered the
 code. That is the most useful thing this round found — not the bug, but the reason the bug
 survived two previous audits and 135 passing tests.
+
+
+---
+
+## Round 4 — 2026-08-10, the seams between things that landed in different weeks
+
+Method: for each pair of features that were built at different times, ask what the earlier one
+assumed about the later one, and whether that assumption is still true.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 4.1 | **The uninstaller did not remove the coding-agent integrations.** It was written before them, and its step reported *"nothing was ever written"* — which was true when written and became a lie the moment the integrations shipped. Uninstalling would have left Lidwing's hook in somebody's `~/.claude/settings.json`, pointing at a binary that was no longer there. | **High** | The step now calls the real uninstall for every agent, reports which files it touched, and fails the run if any of them could not be cleaned up. Three tests bind the two halves: the agent list and the uninstall surface must match, and the marker the uninstaller matches on must be the one the installer writes. |
+| 4.2 | The menu **rows** were still English after the menu **header** was translated, so a Russian user would have seen one language in the header and another in every row under it. The catalogue-coverage test could not catch it: a key nothing reads still passes. | Medium | Every row title goes through the catalogue. Only reading the drawing code finds this class of thing. |
+| 4.3 | Settings, the uninstall confirmation and the integration diffs were untranslated — the surfaces where a non-technical user makes the decisions that matter most. | Medium | Translated, and the scope of what deliberately is *not* translated is recorded as decision 0009 rather than left as an accident. |
+
+### Findings, rejected
+
+| Finding | Why |
+|---|---|
+| "The diagnostics output should be translated too." | Its audience is not the user; it is whoever is helping them, and it arrives pasted into an issue or a message. A Russian diagnostics dump is harder for that person to act on. Recorded as a decision rather than an omission. |
+| "Ship the other six languages from the craft spec with machine translation." | I cannot check a translation I cannot read, and these strings say things like *"Lidwing turns off at 20%"*. A mistranslation there means somebody misunderstands when their overnight run will end. The catalogue is keyed by language, so a native speaker can add one as a data change. |
+| "`Uninstaller` should delete the third-party config files it edited." | It removes its own entries and leaves every other byte alone. Deleting somebody's `settings.json` because we once added a line to it would be the single most destructive thing this product could do. |
+
+### The pattern worth naming
+
+Every finding in this round is the same shape: **feature A was correct when written, and feature
+B made it wrong without touching it.** None of them is visible from inside either feature, and
+no test suite that grows alongside the code catches them, because each test was written when its
+own assumption was still true.
+
+The defence is not more tests of the same kind — it is a test that binds the two features
+together and lives in the module where both are visible. `testEveryThirdPartyFileWeCanWriteIsInTheUninstallSurface`
+is that shape: it fails when somebody adds an agent without adding it to the removal path,
+which is exactly how 4.1 happened.
+
+**Round 4 verdict:** one high-severity defect, in the uninstall path, found by asking what an
+old feature assumed about a new one rather than by reading either of them.

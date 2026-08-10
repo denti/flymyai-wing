@@ -75,3 +75,40 @@ final class UninstallTests: XCTestCase {
         }
     }
 }
+
+/// The uninstaller and the integrations landed in different weeks, and the connection between
+/// them is the kind that quietly does not get made. These tests assert the contract that binds
+/// them, in the portable module where both halves are visible.
+extension UninstallTests {
+
+    func testEveryThirdPartyFileWeCanWriteIsInTheUninstallSurface() {
+        // If an agent is ever added without adding its path here, the uninstaller would leave
+        // an entry behind in somebody else's config file - and nothing else would notice.
+        XCTAssertEqual(Set(UninstallSurface.thirdPartyFiles),
+                       [".claude/settings.json", ".codex/config.toml"])
+    }
+
+    func testTheMarkerTheUninstallerMatchesOnIsTheOneTheInstallerWrites() {
+        // Both halves key on the bundle-path fragment. If they ever disagree, install would
+        // succeed and uninstall would silently find nothing to remove.
+        let helper = "/Applications/Lidwing.app/Contents/Resources/lidwing-notify"
+        XCTAssertTrue(helper.contains(LidwingID.integrationMarker))
+
+        let entry = JSONValue.object([
+            (key: "hooks", value: .array([
+                .object([(key: "command", value: .string(helper))])
+            ]))
+        ])
+        XCTAssertTrue(ClaudeSettingsPatch.isOurs(entry))
+    }
+
+    func testAThirdPartyCommandIsNotMistakenForOurs() {
+        let entry = JSONValue.object([
+            (key: "hooks", value: .array([
+                .object([(key: "command", value: .string("/usr/local/bin/somebody-elses-tool"))])
+            ]))
+        ])
+        XCTAssertFalse(ClaudeSettingsPatch.isOurs(entry),
+                       "uninstall would have removed a hook belonging to another tool")
+    }
+}
