@@ -17,13 +17,25 @@ public enum DisarmReason: String, Equatable, Sendable, CaseIterable, Codable {
     /// Copy for the notification the user sees when the machine stood down on its own.
     public var userFacingSentence: String? {
         switch self {
-        case .batteryFloor: return "Stopped at the battery limit. Your Mac is sleeping normally now."
-        case .thermal: return "Your Mac got too hot. Lidwing stopped so it can cool down."
-        case .timer: return "The time limit elapsed. Lidwing stopped."
-        case .agentExited: return "Your coding agent finished. Lidwing stopped."
-        case .watchdogLost: return "Lidwing lost its safety watchdog and stood down."
-        case .unsupportedState: return "Lidwing stood down because this Mac's state changed."
-        case .failure: return "Lidwing stopped protecting this Mac. Open Lidwing for details."
+        case .batteryFloor:
+            return Strings.text("stopped.batteryFloor",
+                                "Stopped at the battery limit. Your Mac is sleeping normally now.")
+        case .thermal:
+            return Strings.text("stopped.thermal",
+                                "Your Mac got too hot. Lidwing stopped so it can cool down.")
+        case .timer:
+            return Strings.text("stopped.timer", "The time limit elapsed. Lidwing stopped.")
+        case .agentExited:
+            return Strings.text("stopped.agentExited", "Your coding agent finished. Lidwing stopped.")
+        case .watchdogLost:
+            return Strings.text("stopped.watchdogLost",
+                                "Lidwing lost its safety watchdog and stood down.")
+        case .unsupportedState:
+            return Strings.text("stopped.unsupportedState",
+                                "Lidwing stood down because this Mac's state changed.")
+        case .failure:
+            return Strings.text("stopped.failure",
+                                "Lidwing stopped protecting this Mac. Open Lidwing for details.")
         case .user, .quit: return nil
         }
     }

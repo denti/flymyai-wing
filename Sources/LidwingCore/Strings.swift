@@ -140,6 +140,28 @@ public enum StringKey {
         StringEntry("notify.recovered.title", "Lidwing quit unexpectedly", ""),
         StringEntry("notify.recovered.body", "Lid-close sleep has been restored.", ""),
         StringEntry("notify.bag.title", "Don't put your Mac in a bag while Lidwing is on", ""),
-        StringEntry("notify.bag.body", "With the lid closed and no airflow it can get very hot.", "")
+        StringEntry("notify.bag.body", "With the lid closed and no airflow it can get very hot.", ""),
+        StringEntry("notify.groundTruthLost.title", "Lidwing is no longer protecting this Mac", ""),
+        StringEntry("notify.groundTruthLost.body",
+         "Something else changed the sleep setting. Open Lidwing for details.", ""),
+        StringEntry("notify.hot.title", "Your Mac is running hot", ""),
+        StringEntry("notify.hot.body", "Lidwing stops automatically if it gets hotter.", ""),
+        StringEntry("notify.lowBattery.title", "Battery is getting low", ""),
+        StringEntry("notify.lowBattery.body",
+         "Lidwing stops soon and lets your Mac sleep normally.", ""),
+
+        // Why an automatic stand-down happened. Every reason explains itself; none of them is
+        // allowed to be silent, because the user's long-running task just ended.
+        StringEntry("stopped.batteryFloor",
+         "Stopped at the battery limit. Your Mac is sleeping normally now.", ""),
+        StringEntry("stopped.thermal", "Your Mac got too hot. Lidwing stopped so it can cool down.",
+         ""),
+        StringEntry("stopped.timer", "The time limit elapsed. Lidwing stopped.", ""),
+        StringEntry("stopped.agentExited", "Your coding agent finished. Lidwing stopped.", ""),
+        StringEntry("stopped.watchdogLost", "Lidwing lost its safety watchdog and stood down.", ""),
+        StringEntry("stopped.unsupportedState",
+         "Lidwing stood down because this Mac's state changed.", ""),
+        StringEntry("stopped.failure",
+         "Lidwing stopped protecting this Mac. Open Lidwing for details.", "")
     ]
 }

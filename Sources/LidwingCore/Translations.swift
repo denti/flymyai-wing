@@ -106,6 +106,21 @@ public enum Translations {
         "notify.recovered.title": "Lidwing неожиданно завершился",
         "notify.recovered.body": "Сон по закрытию крышки восстановлен.",
         "notify.bag.title": "Не убирайте Mac в сумку, пока Lidwing включён",
-        "notify.bag.body": "С закрытой крышкой и без притока воздуха он может сильно нагреться."
+        "notify.bag.body": "С закрытой крышкой и без притока воздуха он может сильно нагреться.",
+        "notify.groundTruthLost.title": "Lidwing больше не защищает этот Mac",
+        "notify.groundTruthLost.body": "Настройку сна изменило что-то ещё. "
+            + "Откройте Lidwing, чтобы посмотреть детали.",
+        "notify.hot.title": "Mac сильно греется",
+        "notify.hot.body": "Если станет горячее, Lidwing выключится сам.",
+        "notify.lowBattery.title": "Батарея на исходе",
+        "notify.lowBattery.body": "Скоро Lidwing выключится и даст Mac уснуть как обычно.",
+
+        "stopped.batteryFloor": "Остановлено на пороге батареи. Mac засыпает как обычно.",
+        "stopped.thermal": "Mac слишком нагрелся. Lidwing выключился, чтобы дать ему остыть.",
+        "stopped.timer": "Время вышло. Lidwing выключился.",
+        "stopped.agentExited": "Агент закончил работу. Lidwing выключился.",
+        "stopped.watchdogLost": "Lidwing потерял сторожевой процесс и выключился.",
+        "stopped.unsupportedState": "Lidwing выключился: состояние Mac изменилось.",
+        "stopped.failure": "Lidwing перестал защищать этот Mac. Откройте его, чтобы посмотреть детали."
     ]
 }

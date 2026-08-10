@@ -43,40 +43,54 @@ extension AppCoordinator {
     static func copy(for notice: UserNotice) -> (String, String)? {
         switch notice {
         case .firstArm:
-            return ("Lidwing is running",
-                    "Look for the wing in your menu bar. You can close the lid now.")
+            return (Strings.text("notify.firstArm.title", "Lidwing is running"),
+                    Strings.text("notify.firstArm.body",
+                                 "Look for the wing in your menu bar. You can close the lid now."))
         case .autoDisarmed(let reason):
             guard let sentence = reason.userFacingSentence else { return nil }
-            return ("Lidwing stopped", sentence)
+            return (Strings.text("notify.stopped.title", "Lidwing stopped"), sentence)
         case .armFailed:
-            return ("Lidwing could not keep this Mac awake",
-                    "Your Mac will still sleep when you close the lid. Open Lidwing for details.")
+            return (Strings.text("notify.armFailed.title",
+                                 "Lidwing could not keep this Mac awake"),
+                    Strings.text("notify.armFailed.body",
+                                 "Your Mac will still sleep when you close the lid. "
+                                 + "Open Lidwing for details."))
         case .releaseFailed:
-            return ("Lidwing could not put your sleep setting back",
-                    "Open Lidwing and choose Repair, or restart your Mac.")
+            return (Strings.text("notify.releaseFailed.title",
+                                 "Lidwing could not put your sleep setting back"),
+                    Strings.text("notify.releaseFailed.body",
+                                 "Open Lidwing and choose Repair, or restart your Mac."))
         case .sleptWhileArmed:
-            return ("Your Mac slept despite protection",
-                    "Lidwing re-armed itself. See Diagnostics for the exact time.")
+            return (Strings.text("notify.slept.title", "Your Mac slept despite protection"),
+                    Strings.text("notify.slept.body",
+                                 "Lidwing re-armed itself. See Diagnostics for the exact time."))
         case .watchdogRecovered:
-            return ("Lidwing quit unexpectedly",
-                    "Lid-close sleep has been restored.")
+            return (Strings.text("notify.recovered.title", "Lidwing quit unexpectedly"),
+                    Strings.text("notify.recovered.body", "Lid-close sleep has been restored."))
         case .groundTruthLost:
-            return ("Lidwing is no longer protecting this Mac",
-                    "Something else changed the sleep setting. Open Lidwing for details.")
+            return (Strings.text("notify.groundTruthLost.title",
+                                 "Lidwing is no longer protecting this Mac"),
+                    Strings.text("notify.groundTruthLost.body",
+                                 "Something else changed the sleep setting. "
+                                 + "Open Lidwing for details."))
         case .degraded(let warning):
             switch warning {
             case .thermalSerious:
-                return ("Your Mac is running hot",
-                        "Lidwing stops automatically if it gets hotter.")
+                return (Strings.text("notify.hot.title", "Your Mac is running hot"),
+                        Strings.text("notify.hot.body",
+                                     "Lidwing stops automatically if it gets hotter."))
             case .batteryNearFloor:
-                return ("Battery is getting low",
-                        "Lidwing stops soon and lets your Mac sleep normally.")
+                return (Strings.text("notify.lowBattery.title", "Battery is getting low"),
+                        Strings.text("notify.lowBattery.body",
+                                     "Lidwing stops soon and lets your Mac sleep normally."))
             case .foreignHolder:
                 return nil      // shown in the menu; a notification here would be noise
             }
         case .bagWarning:
-            return ("Don't put your Mac in a bag while Lidwing is on",
-                    "With the lid closed and no airflow it can get very hot.")
+            return (Strings.text("notify.bag.title",
+                                 "Don't put your Mac in a bag while Lidwing is on"),
+                    Strings.text("notify.bag.body",
+                                 "With the lid closed and no airflow it can get very hot."))
         }
     }
 
