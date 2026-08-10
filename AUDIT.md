@@ -471,3 +471,46 @@ a Mac. The pattern worth naming: every one of them was invisible to the tests be
 check what the code does, and these were all cases of the code doing something perfectly well
 for a case that never arrives — a cast that never matches, a notification never subscribed, a
 comparison never made.
+
+---
+
+## Round 9 — 2026-08-10, read as an attacker
+
+Scope: the three IPC surfaces and the state on disk. Method: assume a hostile process running
+as the same user, and a Mac with more than one account on it.
+
+### The governing question, answered
+
+Nothing here can strand a Mac. The clamshell mask is written only by the state machine, and the
+notify socket structurally holds no reference through which it could arm anything (invariant
+I8). What is at stake is the second promise: that Lidwing's own record of when this Mac was
+awake, and which agent binaries were running, stays the user's.
+
+A same-uid attacker is explicitly **not** a boundary this product can defend - a process running
+as you can already read your files, and macOS defends that line with TCC and the App Sandbox,
+neither of which Lidwing uses or relies on. The boundary that *is* real is other accounts on the
+same Mac, and that is the one these findings are about.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 9.1 | **The state directory's mode was set once and never checked again.** `ensure()` returned as soon as the path existed, so a directory that arrived any other way kept its mode forever - restored from a backup that lost it, migrated by Setup Assistant, created by an earlier build, or made by hand. `createDirectory` neither corrects an existing directory nor complains about one. Inside it: the ledger, the audit log of when this Mac was awake and which agent binaries ran, and both sockets. | Medium | Verify and repair on every launch. The rule is "grants nothing to group or other" rather than "is exactly 0700", so bits it has no opinion about survive and it does not re-chmod a private directory forever. |
+| 9.2 | **`fileExists` follows symlinks**, so a symlink pointing anywhere at all reported a perfectly good state directory. | Medium | `lstat`, and refuse. A symlink is not something that can be repaired, and the honest answer is to decline rather than write the ledger somewhere the user did not choose. A plain file in that position is refused too. |
+| 9.3 | **The control socket was chmod-ed one call after `bind` created it**, so it existed briefly with whatever the process umask allowed. Nothing was reachable through that window, because the containing directory is 0700 - but "unreachable because of the directory" is one mistake away from "reachable". | Low | `umask(0o077)` around the bind, so it is private from the instant it exists. The chmod stays as belt and braces. |
+| 9.4 | **TESTING.md described a test file that does not exist.** It claimed 20 macOS tests as `ControlSocketTests` 6, `NotifyServerTests` 8, `StorageTests` 3, `IntegrationInstallerTests` 7 - a breakdown summing to 24, against a real total of 27, naming a `StorageTests` that was never written. In a project whose argument is "prove it, don't claim it", a document full of measurements that quietly drifted is worse than one with no numbers, because it reads exactly like a measurement. | Medium | Fixed, and `Scripts/check-documented-numbers.sh` now checks every one of those numbers against the repository on each run. Five positive controls, one of which was the live defect. `StorageTests` now exists and holds the syscall-level tests for 9.1 to 9.3. |
+
+### Findings, rejected
+
+| Finding | Why it was rejected |
+|---|---|
+| "The control socket should authenticate its peer with `getpeereid`." | The socket lives in a 0700 directory and is itself 0600, so the only process that can connect already runs as the user - and a check against our own uid would pass for exactly the attacker it is imagined to stop. It would read as security while adding none. |
+| "The ledger should be signed or checksummed so a tampered one is detected." | Tampering with it requires being the user, who can equally well set the clamshell bit directly with the same unprivileged call Lidwing uses. A signature would protect nothing and would imply a threat model this product does not have. Corruption, as opposed to tampering, is already handled: an unparseable ledger is treated as absent and the machine's own ground truth decides. |
+| "`ensure()` should refuse a too-open directory rather than repairing it." | It is our own directory and the user did not choose its mode. Refusing would disable the product over something that can simply be fixed. A symlink is different, and is refused, because there is no correct repair for it. |
+
+**Round 9 verdict:** four defects, none capable of stranding a Mac, three of them about other
+accounts on a shared Mac rather than about the same-uid attacker this product cannot defend
+against and does not claim to. The fourth was a document quietly claiming things that were not
+true, which in this project is a defect like any other.
+
+---

@@ -10,16 +10,42 @@ public enum SupportDirectory {
         return base.appendingPathComponent(LidwingID.supportDirectoryName, isDirectory: true)
     }
 
+    /// Creates the directory, or checks the one that is already there.
+    ///
+    /// The check is the part that was missing. This used to return as soon as the path existed,
+    /// so a directory created with any other mode kept it forever - restored from a backup that
+    /// lost the mode, migrated by Setup Assistant, or made by hand. Everything Lidwing knows
+    /// lives in here, including an audit log of when this Mac was awake and which agent
+    /// binaries ran.
+    /// - Parameter directory: the directory to create or check. Defaults to the real one; the
+    ///   parameter exists so the tests can run against a sandbox rather than against the state
+    ///   of the machine running them.
     @discardableResult
-    public static func ensure() -> Bool {
-        let path = url.path
-        var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
-            return isDirectory.boolValue
+    public static func ensure(at directory: URL = SupportDirectory.url) -> Bool {
+        let path = directory.path
+
+        // `lstat`, not `fileExists`: that follows symlinks, so a symlink pointing anywhere at
+        // all reports a perfectly good directory. Writing our state through somebody else's
+        // symlink is not something to accept quietly, and it is not something we can repair
+        // either - refusing is the honest answer, and the caller degrades to no ledger rather
+        // than to a ledger somewhere unexpected.
+        var status = stat()
+        if lstat(path, &status) == 0 {
+            if status.st_mode & S_IFMT == S_IFLNK { return false }
+            guard status.st_mode & S_IFMT == S_IFDIR else { return false }
+            let mode = Int(status.st_mode) & 0o7777
+            if StatePermissions.isTooOpen(mode) {
+                // Repair rather than refuse: this is our own directory, the user did not
+                // choose its mode, and refusing would disable the product over something we
+                // can simply fix.
+                chmod(path, mode_t(StatePermissions.tightened(mode)))
+            }
+            return true
         }
         do {
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
-                                                    attributes: [.posixPermissions: 0o700])
+            try FileManager.default.createDirectory(
+                at: directory, withIntermediateDirectories: true,
+                attributes: [.posixPermissions: StatePermissions.directoryMode])
             return true
         } catch {
             return false

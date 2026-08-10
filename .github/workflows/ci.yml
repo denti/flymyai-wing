@@ -86,6 +86,10 @@ jobs:
       # one side ships an app with no watchdog, which launches and looks entirely normal.
       - name: The bundle contains what the app looks for
         run: ./Scripts/check-bundle-contract.sh
+      # TESTING.md claimed a test file that did not exist, with a breakdown that did not sum to
+      # its own total. Numbers in a document are checked by nothing unless something checks them.
+      - name: The numbers in the docs match the repository
+        run: ./Scripts/check-documented-numbers.sh
 
   test-macos:
     runs-on: macos-15

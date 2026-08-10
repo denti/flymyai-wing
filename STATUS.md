@@ -11,7 +11,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **211 unit tests, 0 failures**, 1.4 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **216 unit tests, 0 failures**, 1.3 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -81,6 +81,8 @@ Nothing is idling on any of these.
 | Hook helper | `Scripts/test-notify-helper.sh` — compiles it, runs it, measures it. Part of the ordinary gate on Linux and on macOS |
 | Script hygiene | `shellcheck -S warning` on every script, locally and in CI |
 | Bundle contract | The build script, the signing script and the runtime name the same files in three places. A script checks they agree, with five positive controls |
+| State on disk | The directory is verified and repaired on every launch rather than trusted from its creation; a symlink in its place is refused; sockets are private from the instant `bind` creates them |
+| Documented numbers | Every test count this repository publishes about itself is checked against the repository. It was wrong when the check was written |
 | macOS updates | The build on which an arm last verified is remembered; a change is noticed at launch and reported by the next verified arm. Nothing probes, because nothing may arm unasked |
 | Sound self-check | Fallbacks per chime, a Play button, and a check that names what is missing. Sound is the only channel once the lid is shut |
 | Launch at login | `SMAppService` only, never ticked by default, and the checkbox is read from the live system status rather than a boolean of ours - the one a user can revoke while the app is not running. No checkbox at all on macOS 12, where the only mechanisms are the two the antipattern list forbids |
@@ -100,10 +102,11 @@ Nothing is idling on any of these.
 | [0008](docs/decisions/0008-when-lidwing-makes-a-sound.md) | Chime on arm vs on lid close | Lid close, and standing down with the lid shut |
 | [0009](docs/decisions/0009-localisation-scope.md) | Eight languages vs what can be checked | English and Russian, complete and tested; diagnostics stay English on purpose |
 
-## Audit — eight rounds, all findings fixed
+## Audit — nine rounds, all findings fixed
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 9 (read as an attacker) | Assume a hostile same-uid process, and a Mac with more than one account | **The state directory's mode was set once and never checked again**, and the check that looked for it followed symlinks. Inside that directory: the ledger, both sockets, and an audit log of when this Mac was awake and which agent binaries ran. A directory that arrived from a restored backup, a migration or an earlier build kept whatever mode it had, forever. |
 | 8 (the spec beside the code) | Read `CRAFT.md` §8 and all fifty antipatterns in §11 against the implementation | **Three of the five Settings controls had no help text at all.** The tooltip and the spoken explanation were attached behind `as? NSButton`; a segmented control and two pop-ups are not buttons, and one call site handed the cast a stack view, which could never match. The two silent rows were the battery floor and the duration limit - the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is why it looked fine. |
 | 7 (CI behaving oddly) | A macOS job stopped making progress | **A test that hung instead of failing.** `sun_path` is 104 bytes on macOS and 108 on Linux; the test's socket path fitted only the larger. The listener's `strncpy` truncated and bound elsewhere, `lidwing-notify` correctly refused the over-long path, and `accept()` waited forever. Everything that waits now has a deadline. |
 | 6 (code vs the specification) | Read the transitions with `DESIGN.md` open beside them | **On a Mac with no lid, nothing ever concluded that.** `lidState` correctly stays `.unknown` while the lid driver has not reported — but nothing turned that into a decision, so on a Mac mini the state stayed `.unknown` forever and the user could turn Lidwing on and read *"Awake — you can close the lid"*. |
@@ -112,7 +115,7 @@ Nothing is idling on any of these.
 | 2 | Read as a running process | A modal dialog spins its own run loop, so the reconcile timer fired underneath one and could stack a second dialog on top. And a verify tick that returned early without stopping its own 10 Hz timer. |
 | 3 | Fresh eyes, trace every write | **High.** The Repair button could not clear a bit left behind by a previous process, and reported success. It survived two audits and 135 passing tests because `MockSystem` wrote unconditionally — a mock more permissive than the machine does not test, it reassures. |
 
-Twenty-three rejected findings are recorded with their reasons.
+Twenty-six rejected findings are recorded with their reasons.
 
 ## NEXT
 

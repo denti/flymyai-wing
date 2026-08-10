@@ -92,16 +92,25 @@ public enum UnixSocket {
         let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return nil }
         let size = socklen_t(MemoryLayout<sockaddr_un>.size)
+        // `bind` creates the socket file with 0777 & ~umask, and the `chmod` that used to
+        // follow it left a window in which the socket existed with whatever the process umask
+        // allowed. The window is short and the containing directory is 0700, so nothing was
+        // reachable through it - but "unreachable because of the directory" is one mistake away
+        // from "reachable", and a umask costs nothing. Now it is private from the instant it
+        // exists, and the chmod afterwards is belt and braces for an inherited umask that
+        // already cleared those bits.
+        let previousMask = umask(mode_t(0o077))
         let bound = withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { generic in
                 bind(descriptor, generic, size)
             }
         }
+        umask(previousMask)
         guard bound == 0 else {
             close(descriptor)
             return nil
         }
-        chmod(path, 0o600)
+        chmod(path, mode_t(StatePermissions.fileMode))
         guard Darwin.listen(descriptor, backlog) == 0 else {
             close(descriptor)
             unlink(path)

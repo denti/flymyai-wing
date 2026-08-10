@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **211** |
+| Tests | **216** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -96,7 +96,7 @@ Broadening that coverage is on the list in §6.
 | | |
 |---|---|
 | Command | `swift test` on `macos-15` |
-| Tests | **20** (`ControlSocketTests` 6, `NotifyServerTests` 8, `StorageTests` 3, `IntegrationInstallerTests` 7) on top of the 162 shared with Linux |
+| Tests | **33** (`ControlSocketTests` 9, `NotifyServerTests` 9, `StorageTests` 6, `IntegrationInstallerTests` 9) on top of the suite shared with Linux |
 | Covers | the control-socket wire format, an `AF_UNIX` loopback, socket permissions, the ledger's temp-file-plus-`rename` write, the audit log's append and read-back |
 | Cannot cover | anything needing a lid, a battery, a real power event, or a window server (§5) |
 
@@ -159,6 +159,7 @@ user's agent, and actually gets the data.
 | Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
 | Lint | `swiftlint lint --strict` | **0 violations in 138 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
 | Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
+| Documented numbers | `./Scripts/check-documented-numbers.sh` | pass | Five controls red, one of which was live in the repository: TESTING.md claimed a `StorageTests` file that did not exist, a total of 20 against 27 actual, and a breakdown that summed to 24. |
 | Modals activate first | `./Scripts/check-core-purity.sh` | pass, 12 call sites | Written after finding the un-activated "already running" alert by hand; it then found a **second** one I had missed in the same by-hand pass. Removing either `NSApp.activate` turns it red. |
 | Bundle contract | `./Scripts/check-bundle-contract.sh` | pass | Five controls, each proven red: the watchdog renamed in the build, the helper dropped from signing, a bundle id drifting in a workflow, the constant made unextractable, the agent plist missing from the build. Two of the five failed first time because of defects **in the check** - see `AUDIT.md` round 8. |
 | Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |
