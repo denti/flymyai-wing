@@ -1,5 +1,67 @@
 # STATUS
 
+## HANDOFF — paused 2026-08-10, picked up cold
+
+**Last known-good build: `fbb21c7`.** All seven CI jobs green (`core-linux`, `core-purity`,
+`shellcheck`, `lint`, `test-macos`, `canary-26`, `build`). 309 Linux tests, 314 on macOS 15 and
+macOS 26, zero failures, zero skipped. The tree is clean; nothing is mid-edit.
+
+**Latest release: [v0.1.4](https://github.com/denti/flymyai-wing/releases/tag/v0.1.4)**,
+pre-release, ad-hoc signed. Denis is running it. v0.1.0 through v0.1.3 are still published and
+**all have real defects** — v0.1.0/0.1.1 crash on launch on any Mac where the clamshell bit is
+already set, v0.1.1/0.1.2 show a false `powerd` warning on every launch, and v0.1.2/0.1.3 stop
+a Mac idle-sleeping for the whole lease. Anyone testing should use v0.1.4 or later.
+
+### Blocked, and on whom
+
+| What | On whom | Why it matters |
+|---|---|---|
+| **The 8-hour M0 soak**, with five charger plug/unplug cycles | **Denis** — `./spike/m0-run.sh --soak` | The mechanism is proven for **twelve seconds**. The soak is the only thing that can show the powerd stomp, the dark-wake hole, and long-run stability. Everything else in this repository is downstream of it. |
+| **Low Power Mode helper** | **Denis** — decision needed | He ruled it ships off, and enabling it installs a privileged helper (decision 0010). But `SMAppService.daemon` asks for **approval in System Settings ▸ Login Items**, not the administrator password his directive assumed. `SMJobBless` is deprecated and the spec explicitly rejects it. No UI copy has been written until somebody sees what that flow actually shows. `docs/human-checklist.md` **H9** is the 30-second command that settles the premise. |
+| **USPTO trademark search** | **Denis** — `docs/human-checklist.md` H0 | Every other registry is clear. Blocks the first published build, not development. |
+| **Apple Developer Program** | **Denis** — H4, multi-week lead time | Until it lands, every build is ad-hoc signed and needs the six-step Gatekeeper dance. `sign.sh` takes the identity the moment it exists, with no rewrite. |
+| The keyboard and VoiceOver pass | **Denis** — H8 | The one part of the product a Linux box cannot check at all. |
+
+### What I was about to do next, and why
+
+Nothing was in flight. The last change (`fbb21c7`) is complete and tested.
+
+The next thing I would have picked up: **the compatibility matrix as a real milestone**
+(`ADDENDUM.md` §2, `DESIGN.md` M6). `HardwareSupport` already refuses to claim anything without
+evidence and the M0 script now prints the row it earns, so the loop is closed — but exactly one
+machine is in the table, at the weaker of two levels. Growing it needs other Macs, which is
+procurement, not engineering.
+
+After that, the **real README** — it is deliberately still one line. `DECISIONS.md` says it is
+written last, and it may only list combinations with a green acceptance run, which today is none.
+
+### Traps a fresh reader will walk into
+
+1. **The spec is not in this repository and must never be committed.** It lives at
+   `/home/denti/lidwing/spec/` on Denis's box. `spec/` is in `.gitignore` defensively. The repo
+   is public and those documents are the entire product pitch.
+2. **None of the Darwin targets compile on Linux.** `swift build` here builds `LidwingCore` only.
+   CI is the only compiler for `LidwingApp`, `LidwingSystem` and `lidwingd`, so every typo in
+   them costs a six-minute round trip. Walk new Darwin symbols against their declarations before
+   pushing; this cost three red builds before I started doing it.
+3. **`Scripts/check.sh` is the gate and it is not optional.** It runs actionlint, shellcheck,
+   core purity, the bundle contract, the documented numbers, the M0 verdict logic, the report
+   floors, a warnings-as-errors build, the tests, the notify helper and `swiftlint --strict`.
+   It catches things CI would, minutes earlier.
+4. **The documented-numbers gate will fail the moment you add a test.** That is deliberate:
+   `TESTING.md` publishes counts and `Scripts/check-documented-numbers.sh` checks every one
+   against the repository. Update the number, do not delete the check.
+5. **Every gate here has been watched failing.** If you add one, prove it red before trusting it
+   — `AUDIT.md` records two occasions where a check I had just written could not fail, and one
+   where the positive control passed for the wrong reason.
+6. **`isCleanSoak` and `cleanliness` distinguish "unmeasured" from "clean".** `darkWakeCountDelta`
+   is deliberately `nil` because this app cannot measure it yet. Do not "fix" that by writing a
+   zero — that was the bug.
+7. **CI cancels in-flight runs on a new push** (`concurrency: cancel-in-progress`). A run showing
+   `cancelled` is usually me pushing again, not a failure — but check, because a real failure
+   looks similar in the list.
+
+
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
