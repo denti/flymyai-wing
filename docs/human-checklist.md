@@ -92,6 +92,11 @@ close to 120.
 **Send:** `docs/m0/short-mecha-<timestamp>/` — the whole directory, zipped. The raw logs are the
 result.
 
+On a PASS the verdict now ends with a `compatibility row` block — the exact line for
+`HardwareSupport.records`. That is the only way a Mac gets into the compatibility table: the
+table grows from evidence, and the evidence prints its own row so nobody has to write one from
+memory. It prints the *weaker* of the two levels, because a short form is not an acceptance run.
+
 Whatever happens, the machine is left exactly as it was found: mechanism A writes nothing that
 survives a reboot, and the kernel initialises the bit to zero at boot. If you want to check:
 `ioreg -r -c IOPMrootDomain -d 1 | grep -E 'SleepDisabled|AppleClamshell'`.
@@ -251,8 +256,13 @@ Read-only. It never writes a system setting, never asks for root and never arms 
 ssh <mac> 'bash -s -- --app /Applications/Lidwing.app' < Scripts/lidwing-smoke.sh
 ```
 
-**Expected:** `SUMMARY pass=… fail=0 skip=…`. The skips are the point — a lid cannot be closed
-by a script, and the script says so in every run rather than quietly omitting the line.
+**Expected:** `SUMMARY pass=… fail=0 skip=…`, followed by an `EVIDENCE none` line. The skips are
+the point — a lid cannot be closed by a script, and the script says so in every run rather than
+quietly omitting the line.
+
+The `EVIDENCE none` line is deliberate: a read-only smoke proves the bundle loads and the API
+surface exists, and **nothing about a closed lid**, so it earns no row in the compatibility
+table. Only `spike/m0-run.sh` does.
 
 ---
 

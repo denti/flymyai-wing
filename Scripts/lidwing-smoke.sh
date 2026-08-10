@@ -51,6 +51,10 @@ fi
 # ---------------------------------------------------------------- fingerprint
 
 OS_VER="$(sw_vers -productVersion 2>/dev/null)"
+# `hw.model` is the key the compatibility table matches on - Mac14,2, not "MacBook Pro". Two
+# machines with the same marketing name have different thermal envelopes and different model
+# identifiers, and the table is exact on purpose.
+HW_MODEL="$(sysctl -n hw.model 2>/dev/null || echo unknown)"
 OS_BUILD="$(sw_vers -buildVersion 2>/dev/null)"
 ARCH="$(uname -m)"
 MODEL="$(sysctl -n hw.model 2>/dev/null)"
@@ -230,7 +234,16 @@ else
   skip lid.endurance "lidless hardware: this cell can never be covered here at any price"
 fi
 
-echo "SUMMARY pass=$PASS fail=$FAIL skip=$SKIP chassis=$CHASSIS os=$OS_VER arch=$ARCH"
+echo "SUMMARY pass=$PASS fail=$FAIL skip=$SKIP chassis=$CHASSIS model=$HW_MODEL os=$OS_VER arch=$ARCH"
+
+# What this run is worth, stated so nobody has to infer it.
+#
+# A green smoke proves the bundle loads, the API surface exists and nothing on this machine is
+# in a state Lidwing would refuse. It proves **nothing about a closed lid**, because it never
+# arms anything - that is the contract at the top of this file. So it does not earn a row in the
+# compatibility table, and saying so here is cheaper than explaining later why the table grew
+# from a test that could not have failed for the reason the row would claim.
+echo "EVIDENCE none - a read-only smoke earns no compatibility row. Only spike/m0-run.sh does."
 if [ "$SKIP" -gt 0 ]; then
   echo "NOTE  $SKIP assertion(s) were SKIPPED. A skip is not a pass."
 fi

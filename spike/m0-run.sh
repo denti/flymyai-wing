@@ -417,6 +417,20 @@ fi
   echo "model:          $(sysctl -n hw.model)"
   echo "arch:           $(uname -m)"
   echo "final_sleepdisabled: $(sleep_disabled)"
+  # On a pass, the exact line to add to `HardwareSupport.records`. The table may only grow from
+  # evidence, so the evidence prints the row rather than leaving somebody to write it from
+  # memory - and it prints the weaker of the two levels, because a short form is not an
+  # acceptance run and the difference is the whole reason there are two levels.
+  if [ "$VERDICT" = PASS ]; then
+    echo ""
+    echo "compatibility row (paste into Sources/LidwingCore/HardwareSupport.swift):"
+    echo "        Record(model: \"$(sysctl -n hw.model 2>/dev/null || echo unknown)\", macOSMajor: $(sw_vers -productVersion 2>/dev/null | cut -d. -f1), arch: \"$(uname -m)\","
+    if [ "$DURATION" -ge 28800 ]; then
+      echo "               level: .mechanismSeen(evidence: \"M0 soak, $(date -u +%F), $DURATION s\"))"
+    else
+      echo "               level: .mechanismSeen(evidence: \"M0 short form, $(date -u +%F), $DURATION s\"))"
+    fi
+  fi
 } | tee "$OUT/verdict.txt"
 
 say "=== $VERDICT ==="
