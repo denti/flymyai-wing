@@ -26,7 +26,7 @@ final class SettingsWindowController: NSWindowController {
 
     init(coordinator: AppCoordinator) {
         self.coordinator = coordinator
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
                               styleMask: [.titled, .closable],
                               backing: .buffered, defer: false)
         window.title = "Lidwing Settings"
@@ -102,6 +102,37 @@ final class SettingsWindowController: NSWindowController {
             "You can't see the screen with the lid closed, so Lidwing says it out loud."))
 
         stack.addArrangedSubview(separator())
+        stack.addArrangedSubview(sectionHeader("Coding agents"))
+
+        let agentsNote = NSTextField(labelWithString:
+            "Lidwing can make a sound when your agent is waiting for you, so you hear it with "
+            + "the lid closed. It shows you every line before it writes one.")
+        agentsNote.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        agentsNote.textColor = .secondaryLabelColor
+        agentsNote.lineBreakMode = .byWordWrapping
+        agentsNote.preferredMaxLayoutWidth = 400
+        stack.addArrangedSubview(agentsNote)
+
+        for agent in IntegrationInstaller.Agent.allCases {
+            let present = IntegrationInstaller.isPresent(agent)
+            let label = NSTextField(labelWithString:
+                present ? "\(agent.displayName) - found at ~/\(agent.relativePath)"
+                        : "\(agent.displayName) - not installed")
+            let add = NSButton(title: "Show What Will Be Written\u{2026}",
+                               target: self, action: #selector(addIntegration(_:)))
+            add.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
+            add.isEnabled = present
+            let remove = NSButton(title: "Remove", target: self,
+                                  action: #selector(removeIntegration(_:)))
+            remove.identifier = NSUserInterfaceItemIdentifier(agent.rawValue)
+            remove.isEnabled = present
+            let row = NSStackView(views: [label, add, remove])
+            row.orientation = .horizontal
+            row.spacing = 8
+            stack.addArrangedSubview(row)
+        }
+
+        stack.addArrangedSubview(separator())
 
         let warning = NSTextField(labelWithString:
             "\u{26A0}\u{FE0E} Don't put your Mac in a bag while Lidwing is on.")
@@ -173,6 +204,18 @@ final class SettingsWindowController: NSWindowController {
         durationPopUp.selectItem(at: durationIndex ?? 3)
         thermalCheckbox.state = settings.thermalGuardEnabled ? .on : .off
         soundCheckbox.state = Preferences.shared.soundEnabled ? .on : .off
+    }
+
+    @objc private func addIntegration(_ sender: NSButton) {
+        guard let raw = sender.identifier?.rawValue,
+              let agent = IntegrationInstaller.Agent(rawValue: raw) else { return }
+        IntegrationsPanel.offerInstall(agent)
+    }
+
+    @objc private func removeIntegration(_ sender: NSButton) {
+        guard let raw = sender.identifier?.rawValue,
+              let agent = IntegrationInstaller.Agent(rawValue: raw) else { return }
+        IntegrationsPanel.remove(agent)
     }
 
     @objc private func settingsChanged() {
