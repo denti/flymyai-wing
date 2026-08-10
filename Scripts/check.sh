@@ -14,6 +14,19 @@ run_swift() {
   docker run --rm -v "$PWD":/src -w /src -u "$(id -u):$(id -g)" -e HOME=/tmp "$DOCKER_SWIFT" "$@"
 }
 
+# A workflow that GitHub refuses to parse produces a run with ZERO jobs and a red tick that
+# names nothing — the hardest kind of red to read. actionlint catches that class before it
+# costs a round trip.
+if [ -x /tmp/actionlint ]; then
+  echo "== workflows"
+  /tmp/actionlint || FAIL=1
+elif command -v actionlint >/dev/null; then
+  echo "== workflows"
+  actionlint || FAIL=1
+else
+  echo "== workflows (skipped: actionlint not installed — see Scripts/README.md)"
+fi
+
 echo "== core purity"
 ./Scripts/check-core-purity.sh || FAIL=1
 

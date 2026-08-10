@@ -146,9 +146,12 @@ jobs:
           fi
       - name: Build universal and assemble the app
         run: ./Scripts/build.sh
+      # `secrets` is not an allowed context in a step `if` — GitHub rejects the whole
+      # workflow, producing a run with zero jobs and a red tick that names nothing. The secret
+      # is lifted into `env` first, and `env` is allowed.
       - name: Import Developer ID (absent secret falls back to ad-hoc)
         id: cert
-        if: ${{ secrets.MACOS_CERT_P12 != '' }}
+        if: env.MACOS_CERT_P12 != ''
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}

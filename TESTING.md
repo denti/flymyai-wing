@@ -1,0 +1,162 @@
+# TESTING
+
+Numbers, and the proof that each suite can fail.
+
+**The governing rule.** A suite that has never been seen red is not evidence. Every layer below
+records the mutation that turned it red and the observed output, because "no failures" read
+from silence is how a green board comes to mean nothing. Empty is never success: no output, a
+run that collected zero tests, a skipped job and a tool that returned nothing are all RED.
+
+Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same cycle.
+
+---
+
+## 1. Unit — LidwingCore, on Linux
+
+| | |
+|---|---|
+| Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
+| Tests | **84** |
+| Failures | 0 |
+| Wall clock | 0.70 s |
+| Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
+
+Breakdown, as reported by the runner: StateMachine 35 · SafetyPolicy 17 · Ledger and
+AuditRecord 13 · MenuPresenter 9 · Version 5 · WingGeometry 5. `LidwingSystemTests` adds 9 more
+on macOS only (§2).
+
+### Positive control — observed, not asserted
+
+The suite went red on its first run, before any of these expectations were adjusted:
+
+```
+/src/Tests/.../SafetyPolicyTests.swift:89: error: XCTAssertEqual failed:
+  ("degrade(LidwingCore.SafetyWarning.thermalSerious)") is not equal to ("ok")
+/src/Tests/.../StateMachineTests.swift:200: error: XCTAssertEqual failed:
+  ("degraded") is not equal to ("armed") - one sample is not evidence
+Executed 67 tests, with 4 failures (0 unexpected)
+```
+
+In all four cases the **code** was right and the **test** was wrong: the policy degrades and
+warns the user while the thermal dwell runs, rather than sitting silent. The expectations were
+corrected to the true behaviour. That is a real red→green transition on this suite.
+
+Deliberate mutation, run afterwards to confirm the suite catches a real defect rather than only
+its own bookkeeping:
+
+| # | Mutation | Defect it simulates | Failures |
+|---|---|---|---|
+| 1 | `SafetyPolicy.evaluate` returns `.ok` first thing | every guard silently disabled | **21** |
+| 2 | `PowerSample.percentage` returns `current` instead of `current * 100 / max` | the raw-mAh bug: a 20 % floor that never fires | **14** |
+| 3 | `verifyTick` calls `completeArming()` without reading ground truth | believing a write that returned success while doing nothing | **9** |
+| 4 | `releaseMechanism` drops the `weSetTheBit` and desktop-mode guards | invariant I7: clearing a bit powerd owns | **1** |
+
+Each was applied, measured, and reverted; the suite returned to **84 passed, 0 failed** after
+every one.
+
+**Mutation 4 is the thin one, and it is worth saying so.** Exactly one test
+(`testWeNeverClearTheBitInAConfigurationPowerdOwns`) stands between that change and shipping,
+which means a careless edit to that single test would remove the only guard on an invariant
+whose failure mode is *sleeping somebody else's lid-closed Mac in the middle of their work*.
+Broadening that coverage is on the list in §6.
+
+---
+
+## 2. Unit — LidwingSystem, on macOS
+
+| | |
+|---|---|
+| Command | `swift test` on `macos-15` |
+| Tests | **9** (`ControlSocketTests` 6, `StorageTests` 3) on top of the 84 shared with Linux |
+| Covers | the control-socket wire format, an `AF_UNIX` loopback, socket permissions, the ledger's temp-file-plus-`rename` write, the audit log's append and read-back |
+| Cannot cover | anything needing a lid, a battery, a real power event, or a window server (§5) |
+
+### Positive control
+
+`testLoopbackDeliversLines` asserts `count > 0` on the read **before** decoding, precisely so a
+socket that delivers nothing fails instead of decoding an empty buffer into a nil that a
+weaker test would have skipped over.
+
+---
+
+## 3. Static gates
+
+| Gate | Command | Result | Positive control |
+|---|---|---|---|
+| Core purity | `./Scripts/check-core-purity.sh` | pass, 11 files scanned | Inserting `import AppKit` into `Sources/LidwingCore/Version.swift` produced `FAIL: LidwingCore imports a platform-specific framework` and exit 1; removing it returned exit 0. Transcript below. |
+| Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
+| Lint | `swiftlint lint --strict` | **0 violations in 72 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
+| Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
+| Artifact invariants | `./Scripts/invariants.sh` | *pending the first packaged build* | Written before the first artifact exists, deliberately. |
+
+```
+$ sed -i '1i import AppKit' Sources/LidwingCore/Version.swift
+$ ./Scripts/check-core-purity.sh; echo "exit=$?"
+Sources/LidwingCore/Version.swift:1:import AppKit
+FAIL: LidwingCore imports a platform-specific framework (above).
+exit=1
+$ git checkout Sources/LidwingCore/Version.swift
+$ ./Scripts/check-core-purity.sh; echo "exit=$?"
+core purity OK (11 files scanned)
+exit=0
+```
+
+The script also refuses to pass when it scanned no files at all, so a rename that empties its
+search path fails loudly instead of quietly reporting success.
+
+---
+
+## 4. Load and stress
+
+| Test | Scale | Result |
+|---|---|---|
+| `testOneThousandArmDisarmCyclesLeaveNoResidue` | 1000 full arm→verify→disarm→verify cycles | ground truth stock at the end, `weSetTheBit == false`, zero leaked assertions, no ledger left behind, watchdog disconnected. 64 ms. |
+| `testRandomEventSequencesNeverLeaveUsArmedWithoutTheBit` | 200 runs × 60 events, deterministic PRNG, with the world perturbed between events (AC flips, thermal transitions, battery jumps, watchdog failures, mechanism failures) | the invariant held on all 12 000 transitions. 73 ms. |
+
+The property test asserts two things after **every** event: protecting implies we own the
+mechanism, and quiescent implies we hold nothing. A seeded `SplitMix64` means a failure
+reproduces exactly rather than "sometimes".
+
+---
+
+## 5. What none of this proves, and where it will be proved
+
+CI has no lid, no battery, no real power events and no Aqua session. In particular:
+
+* whether a Mac stays awake with the lid physically closed — **`docs/M0-spike.md`**, on Denis's
+  MacBook, and nothing else on Earth can answer it;
+* `pmset -g stats` deltas across a real sleep;
+* whether the status item is visible and legible on a light bar, a dark bar, a translucent bar
+  over a bright wallpaper, and on a 16-inch MacBook Pro with ten other items;
+* the Gatekeeper first-launch flow;
+* thermal behaviour under a real closed-lid load;
+* idle CPU and idle wake-ups as measured numbers.
+
+Every one of those is an item in `docs/human-checklist.md` with the exact command and the
+expected observation. None of them is claimed here until it has been run.
+
+---
+
+## 6. Still to build
+
+Named so that their absence is visible rather than implied:
+
+- Fault injection against the real binaries: `kill -9` while armed, a dirty ledger, a corrupt
+  ledger, reboot while armed. The logic is unit-tested; the *processes* are not yet.
+- A soak measuring the app's own memory, file-descriptor growth and idle CPU as hard numbers.
+- The compatibility matrix run.
+- The uninstaller, and the before/after diff that proves it left nothing.
+- A second, independent test of invariant I7 (see mutation 4 above).
+
+---
+
+## 7. Failures this regime has already caught
+
+Recorded because a test regime's value is what it stopped, not what it asserts.
+
+| What | How it would have shipped | Caught by |
+|---|---|---|
+| `if: ${{ secrets.MACOS_CERT_P12 != '' }}` in a step | GitHub rejects the workflow and runs **zero jobs**, reporting failure with no job, no log and no annotation. The signing path would simply never have run, and the red tick would have looked like flakiness. | `actionlint`, now part of `Scripts/check.sh` |
+| The CI test-count assertion read the **first** `Executed N tests` line | It asserted on 13 tests out of 79 — a suite could have lost 80 % of its coverage and still passed the guard that exists to prevent exactly that | reading the log rather than the exit code |
+| `IOPMCopyAssertionsByProcess()` used as if it returned a dictionary | It answers through an out-parameter. The idle-assertion verification would not have compiled — but the same shape of mistake in a function that *does* return an optional would have silently reported "we hold no assertion" forever | the macOS compiler in CI |
+| `wingprobe disarm` called `arm()` on its way to disarming | The safety valve, the command a user runs when they think their Mac is stuck awake, would have **armed** it | reading the code back before shipping it |
