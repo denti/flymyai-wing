@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **232** |
+| Tests | **244** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -75,9 +75,13 @@ its own bookkeeping:
 | 25 | Low Power Mode engages on AC | the agent runs slower and the user saves nothing, because there is nothing to save from a socket | **2** |
 | 26 | It writes a value that is already in place | a privileged write that changes nothing and leaves a trace in the user's own `pmset -g custom` | **3** |
 | 27 | Restore overwrites a value somebody else changed after us | the app deciding it knows better than the user, in a setting it needed a password to touch | **1** |
+| 28 | Unknown hardware reported as accepted | the compatibility table becoming a wish list - the exact thing "there are many different MacBooks" forbids | **13** |
+| 29 | Model matching relaxed to a prefix, so `Mac14,3` counts as `Mac14,2` | a different machine with a different thermal envelope, claimed on somebody else's evidence | **3** |
+| 30 | The "untested" line goes silent | a claim made by implication, which is the kind this project is least allowed to make | **2** |
+| 31 | The twelve-second M0 short form recorded as a full acceptance run | overstating the single piece of real-hardware evidence that exists | **3** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

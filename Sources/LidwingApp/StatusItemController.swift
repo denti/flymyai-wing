@@ -115,6 +115,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         timer.resume()
     }
 
+    /// Computed once: the model, the OS and the architecture do not change while the app runs,
+    /// and this is consulted on every menu open.
+    static let hardwareNotice: String? = HardwareSupport.notice(
+        for: HardwareSupport.level(model: RootDomain.sysctlModel() ?? "unknown",
+                                   macOSMajor: ProcessInfo.processInfo
+                                       .operatingSystemVersion.majorVersion,
+                                   arch: AppCoordinator.architecture()))
+
     // MARK: menu
 
     /// Rebuilt on every open, so what the user reads is the truth at the instant they looked,
@@ -148,6 +156,16 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         items.append(disabled(content.headline, secondary: false))
         if let detail = content.detail {
             items.append(disabled(detail, secondary: true))
+        }
+        // What this build has actually been proven on. Shown in the menu rather than in a
+        // dialog, and only when there is something to say: an accepted machine is told nothing,
+        // because a product that congratulates itself for working on every launch is noise.
+        //
+        // "There are many different MacBooks" - one green run on one Apple Silicon laptop is not
+        // evidence for the fleet, and this is where the app admits that to the person in front
+        // of it rather than only in a document they will never read.
+        if let evidence = Self.hardwareNotice {
+            items.append(disabled(evidence, secondary: true))
         }
         items.append(.separator())
 

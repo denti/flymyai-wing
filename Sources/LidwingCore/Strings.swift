@@ -112,6 +112,14 @@ public enum StringKey {
         StringEntry("login.failed", "macOS would not change this: %1$@",
          "%1$@ is a system error message. Shown when register or unregister throws."),
 
+        StringEntry("hardware.untested",
+         "Lidwing has not been tested on this Mac. It will tell you if it cannot do its job.",
+         "Shown when no acceptance run has happened on this model, macOS and architecture. It "
+         + "must not read as a prediction of failure - what is missing is evidence, not a "
+         + "working mechanism."),
+        StringEntry("hardware.partial", "Tested briefly on this kind of Mac, not for a full run.",
+         "Shown where the mechanism has been seen working but no full acceptance run happened."),
+
         // Menu — the entire visible surface of the product.
         StringEntry("menu.toggle", "Keep Awake with the Lid Closed",
          "The one command in the menu. Title case."),

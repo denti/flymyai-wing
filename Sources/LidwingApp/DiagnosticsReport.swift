@@ -25,6 +25,13 @@ enum DiagnosticsReport {
         lines.append("macOS \(ProcessInfo.processInfo.operatingSystemVersionString)  "
                      + "\(architecture())  \(hardwareModel())")
         lines.append("Method: Tier 1 (clamshell mask + idle assertion, no privileges)")
+        // Always present, including when the answer is "untested". A support bundle is read by
+        // somebody who cannot see the machine, and which Mac this has actually been proven on
+        // is half the answer to most of what they will want to ask.
+        let evidence = HardwareSupport.diagnosticsLine(model: hardwareModel(),
+                                                       macOSMajor: macOSMajor(),
+                                                       arch: architecture())
+        lines.append("Evidence: \(evidence)")
         lines.append("")
 
         lines.append("Ground truth")
@@ -121,6 +128,12 @@ enum DiagnosticsReport {
         #else
         return "unknown"
         #endif
+    }
+
+    /// The macOS major version. `operatingSystemVersion` rather than the display string, which
+    /// is localised and has been reformatted between releases.
+    static func macOSMajor() -> Int {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion
     }
 
     private static func hardwareModel() -> String {

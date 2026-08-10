@@ -13,7 +13,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   claim that used to sit here was false, and it was false in the way that matters: it was
   checkable, and nothing checked it. Both failures were the test's own socket path exceeding
   `sun_path` on a CI runner, not a product defect - but that is luck, not diligence.
-- **216 unit tests, 0 failures**, 1.3 s on Linux; the same suite plus 33 macOS-only tests in CI.
+- **244 unit tests, 0 failures**, 2.1 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -26,10 +26,11 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, twenty-three ways**, and every gate in the
+- **The suite has been proven able to fail, thirty-one ways**, and every gate in the
   repository has now been watched failing at least once except one, which is named as unproven
   in `TESTING.md` rather than listed beside the others. Deliberate mutations produced
-  21, 14, 9, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1 and 1 failures. Numbers
+  21, 14, 13, 9, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1
+  and 1 failures. Numbers
   and mutations are in `TESTING.md`; the ones caught by a single test are called out as the weak
   spots rather than averaged away.
 - **1000 arm/disarm cycles** leave ground truth stock, zero leaked assertions, no ledger.
@@ -132,6 +133,7 @@ Nothing is idling on any of these.
 | Workflow pipes | Every `run:` block that pipes is checked for `set -o pipefail`, parsed as block scalars rather than by proximity. Six steps were masking their exit codes, two of them the canary's |
 | Run completeness | Every script that summarises now knows how many assertions a complete run makes and refuses to report success when fewer ran. `invariants.sh` proves its own guard in CI on every build; the two Mac-only scripts have theirs extracted and tested, because they execute nowhere else |
 | The M0 verdict | The arithmetic that decides the architecture is extracted from the shipped script and run against sixteen cases, including the one that mattered: a run in which the lid was never closed |
+| Honest hardware | `HardwareSupport` carries what has actually been **run**, never what should work. Exactly one machine is listed, at the weaker of two levels, citing the run. Anything else is `untested`, and the menu says so in a line that does not read as a prediction of failure |
 | macOS updates | The build on which an arm last verified is remembered; a change is noticed at launch and reported by the next verified arm. Nothing probes, because nothing may arm unasked |
 | Sound self-check | Fallbacks per chime, a Play button, and a check that names what is missing. Sound is the only channel once the lid is shut |
 | Launch at login | `SMAppService` only, never ticked by default, and the checkbox is read from the live system status rather than a boolean of ours - the one a user can revoke while the app is not running. No checkbox at all on macOS 12, where the only mechanisms are the two the antipattern list forbids |
