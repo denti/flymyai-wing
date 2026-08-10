@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **216** |
+| Tests | **232** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -71,15 +71,25 @@ its own bookkeeping:
 | 21 | `requiresApproval` counts as launching at login | reads as on inside the app, launches nothing at login | **2** |
 | 22 | macOS 12 gets the login checkbox anyway | a control that cannot work, where no compliant mechanism exists | **2** |
 | 23 | The login item is deregistered after the user is sent to the app | `SMAppService` identifies the item by the app; one already in the Trash cannot deregister itself | **1** |
+| 24 | Low Power Mode engages regardless of the user's opt-in | a password prompt and a helper install nobody asked for - the trust property in decision 0010 | **3** |
+| 25 | Low Power Mode engages on AC | the agent runs slower and the user saves nothing, because there is nothing to save from a socket | **2** |
+| 26 | It writes a value that is already in place | a privileged write that changes nothing and leaves a trace in the user's own `pmset -g custom` | **3** |
+| 27 | Restore overwrites a value somebody else changed after us | the app deciding it knows better than the user, in a setting it needed a password to touch | **1** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist
 because the mock was corrected to model a guard the real machine has and the mock did not.
 
-**Mutations 4, 8, 9, 10, 13, 15 and 23 are each caught by exactly one test.** They are listed
+Mutation 27 needed the code changed before it could be caught at all: the "somebody else changed
+it" guard and the "it already equals the original" guard are indistinguishable for a two-valued
+setting, so disabling the first one changed nothing any test could see. `writesToRestore` now
+decides using the same predicate it reports, which makes the fact told to the user and the action
+taken by the code the same thing — and makes the mutation detectable.
+
+**Mutations 4, 8, 9, 10, 13, 15, 23 and 27 are each caught by exactly one test.** They are listed
 individually rather than averaged into a comfortable number, because a single test is a single
 careless edit away from being the only thing that noticed.
 

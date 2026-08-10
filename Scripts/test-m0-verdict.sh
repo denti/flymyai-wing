@@ -99,6 +99,59 @@ expect FAIL "too few heartbeats"                --because "heartbeats" TICKS=0
 # Mechanism B does not run wingprobe, so its exit status must not be consulted there.
 expect PASS "mechanism b ignores probe status"  MECHANISM=b PROBE_STATUS=3
 
+# ---------------------------------------------------------------- the teardown
+#
+# Denis interrupted a real run at 36 s of a 120 s window and the harness could not say whether
+# the machine had been left stock. `AppleClamshellCausesSleep` read `No` afterwards, which meant
+# nothing either way - the key is stale between kernel events. An interrupted run is the normal
+# case, not the exceptional one, so what it leaves behind has to be provable.
+
+TD_START="$(grep -n '^teardown() {' spike/m0-run.sh | head -1 | cut -d: -f1)"
+TD_END="$(grep -n '^}$' spike/m0-run.sh | awk -F: -v s="$TD_START" '$1 > s {print $1; exit}')"
+if [ -z "$TD_START" ] || [ -z "$TD_END" ]; then
+  echo "  FAIL  could not extract teardown from spike/m0-run.sh - this proved nothing"
+  FAIL=$((FAIL + 1))
+else
+  sed -n "${TD_START},${TD_END}p" spike/m0-run.sh > "$WORK/teardown.sh"
+
+  # `disarm_rc` decides what the fake wingprobe returns, so both branches are exercised.
+  teardown_says() {
+    local exit_status="$1" disarm_rc="$2" build_probe="$3"
+    local out="$WORK/td"; rm -rf "$out"; mkdir -p "$out"
+    if [ "$build_probe" = yes ]; then
+      printf '#!/bin/sh\necho "cleared the mask"\nexit %s\n' "$disarm_rc" > "$out/wingprobe"
+      chmod +x "$out/wingprobe"
+    fi
+    OUT="$out" ARMED_B=0 PROBE_PID="" \
+      bash -c "set -uo pipefail
+               say() { :; }
+               sleep_disabled() { echo No; }
+               source '$WORK/teardown.sh'
+               ( teardown $exit_status ) 2>&1" 2>&1
+  }
+
+  td_expect() {
+    local name="$1" want="$2"; shift 2
+    local got; got="$(teardown_says "$@")"
+    if printf '%s' "$got" | grep -q "$want"; then
+      PASS=$((PASS + 1))
+      printf '  ok    %-42s %s\n' "$name" "$want"
+    else
+      FAIL=$((FAIL + 1))
+      printf '  FAIL  %-42s wanted "%s" in: %s\n' "$name" "$want" "$(printf '%s' "$got" | tr '\n' ' ')"
+    fi
+  }
+
+  echo "== M0 teardown"
+  td_expect "an interrupted run says so"        "interrupted:     yes" 130 0 yes
+  td_expect "a clean run says so"               "interrupted:     no"  0   0 yes
+  td_expect "a successful force-clear proves it" "PROVABLY STOCK"      130 0 yes
+  td_expect "a failed force-clear admits it"     "COULD NOT PROVE STOCK" 130 3 yes
+  td_expect "a failed force-clear names the fix" "reboot"              130 3 yes
+  td_expect "nothing armed, nothing claimed"     "NOTHING WAS EVER ARMED" 130 0 no
+  td_expect "the stale key is labelled as such"  "NOT proof of anything" 0 0 yes
+fi
+
 echo "SUMMARY pass=$PASS fail=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
-[ "$PASS" -ge 16 ] || { echo "FAIL  only $PASS cases ran"; exit 1; }
+[ "$PASS" -ge 23 ] || { echo "FAIL  only $PASS cases ran"; exit 1; }

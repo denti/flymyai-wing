@@ -118,8 +118,12 @@ fi
 ARMED_B=0
 PROBE_PID=""
 
+# `status` is passed in rather than read from `$?`, because the second trap installed below runs
+# `cleanup_children` first - and that ends in `|| true`, so `$?` inside here would always be 0
+# and every interrupted run would record itself as a clean one. The field this feeds is the whole
+# point of the block, so it may not be quietly wrong.
 teardown() {
-  local status=$?
+  local status="${1:-0}"
   set +e
   if [ "$ARMED_B" -eq 1 ]; then
     say "TRAP: restoring disablesleep"
@@ -131,12 +135,53 @@ teardown() {
     kill -TERM "$PROBE_PID" 2>/dev/null || true
     sleep 2
   fi
-  # Belt and braces: clear the clamshell bit whatever happened above.
-  [ -x "$OUT/wingprobe" ] && "$OUT/wingprobe" disarm >/dev/null 2>&1
-  say "TRAP: final SleepDisabled=$(sleep_disabled) AppleClamshellCausesSleep=$(ioreg -r -c IOPMrootDomain -d 1 | awk -F'= ' '/"AppleClamshellCausesSleep"/{gsub(/[^A-Za-z]/,"",$2); print $2; exit}')"
+  # Belt and braces: clear the clamshell bit whatever happened above, and - this is the part
+  # that was missing - be able to say afterwards whether the machine is provably stock.
+  #
+  # An interrupted run is the normal case, not the exceptional one: somebody presses Control-C,
+  # or closes the terminal, or the run is cut short because the lid experiment already answered
+  # the question. This block used to force-clear with `>/dev/null 2>&1` and then print
+  # `AppleClamshellCausesSleep` as though that were the answer. It is not: that key is written
+  # by `sendClientClamshellNotification()` and is **stale between kernel events**, so after an
+  # interrupted run it reports whatever it last reported, which on the owner's machine read `No`
+  # and meant nothing either way. Reported as a bug by Denis against exactly this run, and he
+  # was right.
+  #
+  # What can actually be proven: the force-clear writes zero to the mask through the same
+  # unprivileged user client, and its return code is real. That, plus the fact that the kernel
+  # initialises the mask to zero in `IOPMrootDomain::start()`, is the honest evidence.
+  STOCK_PROOF="$OUT/stock-after-run.txt"
+  {
+    echo "when:            $(date -u +%FT%TZ)"
+    echo "interrupted:     $([ "$status" -eq 0 ] && echo no || echo "yes (exit $status)")"
+    if [ -x "$OUT/wingprobe" ]; then
+      DISARM_OUT="$("$OUT/wingprobe" disarm 2>&1)"
+      DISARM_RC=$?
+      echo "force_clear_rc:  $DISARM_RC"
+      echo "force_clear_out: $DISARM_OUT"
+      if [ "$DISARM_RC" -eq 0 ]; then
+        echo "verdict:         PROVABLY STOCK - the clamshell mask was written to zero and the"
+        echo "                 kernel returned success. A reboot would clear it regardless."
+      else
+        echo "verdict:         COULD NOT PROVE STOCK - the force-clear returned $DISARM_RC."
+        echo "                 Run '$OUT/wingprobe disarm' again, or reboot: the mask is a"
+        echo "                 kernel variable initialised to zero at boot, so a restart is an"
+        echo "                 unconditional fix."
+      fi
+    else
+      echo "force_clear_rc:  n/a (wingprobe was never built)"
+      echo "verdict:         NOTHING WAS EVER ARMED by this run, so there is nothing to clear."
+    fi
+    echo ""
+    echo "AppleClamshellCausesSleep now: $(ioreg -r -c IOPMrootDomain -d 1 2>/dev/null | awk -F'= ' '/"AppleClamshellCausesSleep"/{gsub(/[^A-Za-z]/,"",$2); print $2; exit}')"
+    echo "  ^ NOT proof of anything on its own. This key is stale between kernel events, so"
+    echo "    after a run that ended without a lid movement it reports whatever it last saw."
+    echo "SleepDisabled now:             $(sleep_disabled)   (Lidwing never writes this)"
+  } | tee "$STOCK_PROOF"
+  say "TRAP: wrote $STOCK_PROOF"
   exit "$status"
 }
-trap teardown EXIT INT TERM
+trap 'teardown $?' EXIT INT TERM
 
 # ---------------------------------------------------------------- heartbeat
 
@@ -194,7 +239,8 @@ LOAD_PID=$!
 cleanup_children() {
   kill "$HEARTBEAT_PID" "$LOAD_PID" ${LID_PID:+"$LID_PID"} 2>/dev/null || true
 }
-trap 'cleanup_children; teardown' EXIT INT TERM
+# shellcheck disable=SC2154  # rc is assigned in the first command of this same trap
+trap 'rc=$?; cleanup_children; teardown "$rc"' EXIT INT TERM
 
 # ---------------------------------------------------------------- arm
 

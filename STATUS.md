@@ -38,14 +38,43 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
 - The name `Lidwing` is clear on both App Stores, npm, PyPI, GitHub and DNS. USPTO is open
   (`docs/human-checklist.md` H0).
 
-## ASSUMED — and this is still the whole product
+## M0 — the premise is real
 
-- **Nobody has armed the clamshell bit and closed a lid.** Everything downstream of that is
-  reading, not measurement. `docs/M0-spike.md` is the experiment; `spike/m0-run.sh` is the
-  script Denis runs. Until it reports, this is a well-tested program that has never done its
-  job once.
-- Everything about the real machine: a physically closed lid, a real power event, real thermal
-  behaviour, whether the status item is visible on a crowded menu bar, the Gatekeeper flow.
+**The short form passed on real hardware.** Denis's MacBook (Mac14,2 class, macOS 15.5 24F74,
+arm64), **on battery, no external display**. 36 heartbeat ticks, 12 consecutive with the lid
+reported shut, every gap exactly 1.0 s, no gaps at all.
+
+The part that makes it evidence rather than an anecdote is the **positive control on the same
+machine**: `pmset -g log` shows `Entering Sleep state due to Clamshell Sleep` at 13:35:42 for an
+ordinary lid close half an hour earlier, and **no clamshell sleep at all** during the armed
+window at 14:07. So that Mac demonstrably does clamshell-sleep, and demonstrably did not while
+selector 12 was armed. A pass with no control would have been a machine that might simply never
+have slept.
+
+**Tier 1 is the product.** M3 is cancelled as a default path. The privileged helper now exists
+only for the opt-in Low Power Mode, per [0010](docs/decisions/0010-low-power-mode-needs-a-privilege-this-tier-does-not-have.md).
+
+### What it does not prove, carried as caveats rather than buried
+
+- **Twelve seconds, not eight hours.** It proves the clamshell demand-sleep does not fire. It
+  says nothing about the powerd stomp on AC and display events, nothing about the dark-wake
+  hole, and nothing about long-run stability. The soak (`docs/human-checklist.md` H3) is still
+  owed and is still the real evidence.
+- **One MacBook.** See the constraint below; this is now a first-class part of the plan rather
+  than a footnote.
+
+## ASSUMED
+
+- **Every MacBook that is not Denis's.** One green run on one Apple Silicon laptop is not
+  evidence for the fleet, and it is not treated as any. Intel and Apple Silicon, M1 through M4,
+  Air and Pro, fanless and fanned, notch and no notch, T2 Macs, and every macOS from the floor
+  up behave differently — the powerd stomp, the thermal behaviour and the menu bar all vary.
+  **Nothing in the README or the UI may claim a combination that has not had a green acceptance
+  run; it says untested instead.** Compatibility (`ADDENDUM.md` §2, `DESIGN.md` M6) is a
+  first-class milestone from here, and the app is to degrade honestly and visibly when it finds
+  hardware nobody has proven it on.
+- A real power event, real thermal behaviour over hours, whether the status item is visible on a
+  crowded menu bar, and the Gatekeeper flow.
 
 ## BROKEN
 
@@ -53,10 +82,12 @@ Nothing is red.
 
 ## BLOCKERS
 
-- **M0** — the lid experiment. `docs/human-checklist.md` H1–H3. Nothing else can substitute:
-  no rentable Mac on Earth has a hinge. The harness now refuses to report PASS unless the lid
-  was actually shut for most of the run, and its verdict arithmetic is tested by
-  `Scripts/test-m0-verdict.sh` against sixteen cases including that one.
+- **M0 soak** — the short form passed (above); the 8-hour run has not happened.
+  `docs/human-checklist.md` H3. The harness now refuses to report PASS unless the lid was
+  actually shut for most of the run, its verdict arithmetic is tested against sixteen cases, and
+  an interrupted run now writes `stock-after-run.txt` saying whether the machine was left
+  provably stock — which is the bug Denis filed against the first real run, fixed before the
+  soak as he asked.
 - **T5, partially open** — USPTO search for "Lidwing". Every other registry is clear. Blocks
   the first published build, not development.
 - **Low Power Mode cannot be written without root** — and it is a Denis override, default ON

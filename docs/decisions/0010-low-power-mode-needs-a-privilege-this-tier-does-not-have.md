@@ -1,63 +1,84 @@
-# 0010 — Low Power Mode needs a privilege this architecture does not have
+# 0010 — Low Power Mode is the one thing that asks for a password, and only if you ask for it
 
-**Status:** open, escalated to the product owner · **Date:** 2026-08-10
+**Status:** accepted, decided by the product owner · **Date:** 2026-08-10
+**Supersedes:** the "default ON" reading of [0004](0004-low-power-mode.md)
 
-## The problem
+## The problem, as escalated
 
-Two decisions that are each correct on their own do not fit together.
+Two decisions that were each right on their own did not fit together.
 
-* **[0004](0004-low-power-mode.md)** — Low Power Mode ships as a user-facing toggle, **default
-  ON**. This is the product owner's own override, restated twice, and `MISSION.md` §3 marks it
-  "a decided question; do not re-litigate it".
-* **[0002](0002-mechanism-authority.md)** — Tier 1. The clamshell mask plus a named assertion,
-  written by the app itself with **no root, no privileged helper, and no persistent system
-  state**. Chosen on a safety asymmetry: a kernel variable that a reboot clears unconditionally
-  cannot leave a Mac permanently unable to sleep, and nothing in the product needs admin.
+* **[0004](0004-low-power-mode.md)** — Low Power Mode ships as a toggle, **default ON**.
+* **[0002](0002-mechanism-authority.md)** — Tier 1: the clamshell mask and a named assertion,
+  written by the app itself, with **no root, no privileged helper, no persistent system state**.
 
-Low Power Mode is not reachable from Tier 1. The specification says so in three places, written
-by people who were verifying on a real Mac:
+Low Power Mode is not reachable from Tier 1. `pmset` writes system power settings and refuses
+without root; `ProcessInfo.isLowPowerModeEnabled` is read-only and there is no public API to set
+it. The specification says the same in three places, written by people verifying on a real Mac:
+`ADDENDUM.md` §W4 lists `pmset -b/-c lowpowermode` as work **inside the privileged helper**, its
+Appendix A recovery script uses `sudo -n pmset -b lowpowermode`, and `CRAFT.md` §733 calls the
+confirmation dialog for it a gate on "a second **privileged** write".
 
-* `ADDENDUM.md` §W4 lists `pmset -b/-c lowpowermode` as work **inside the privileged helper**,
-  beside `pmset -a disablesleep`.
-* `ADDENDUM.md` Appendix A's recovery script restores it with `sudo -n pmset -b lowpowermode`.
-* `CRAFT.md` §733 describes the confirmation dialog for it as gating "a second **privileged**
-  write".
+Shipping a root component to satisfy a battery toggle inverts the trade 0002 was made on, so it
+was escalated rather than decided here — `DESIGN.md` §12 **T3** in substance.
 
-`pmset` writes system power settings and refuses without root; `ProcessInfo.isLowPowerModeEnabled`
-is read-only and there is no public API to set it. So the toggle cannot do what its label says
-unless Lidwing ships something that runs as root.
+## The decision
 
-## Why this is not mine to decide
+Denis's ruling, and it is now the operative one:
 
-Shipping a root component to satisfy a battery-saving toggle inverts the trade that decision
-0002 was made on. The whole trust argument of this product is "it needs no privileges, and if
-it dies your Mac still sleeps". Adding a privileged helper for Low Power Mode would:
+* **The option ships in Settings, OFF until the user turns it on.**
+* **Turning it on is exactly the moment the privileged helper is installed and an administrator
+  password is requested.** Never at launch. Never for the core lid feature. Never speculatively.
+* **The Settings row says so before the click** — plainly, in the row itself, that enabling this
+  will ask for an administrator password. Not in a dialog that appears afterwards.
+* **The default state of the app stays zero-privilege**, and that is a headline trust property
+  rather than an implementation detail: *a user who never enables Low Power Mode never sees a
+  password prompt and never has a helper installed*. It is said in the UI, and it goes in the
+  README.
+* **Turning the option back off removes the helper** and restores the previous `lowpowermode`
+  value exactly. So does uninstalling the app.
+* **No half-toggle**, confirmed: a checkbox that appears to engage Low Power Mode and does not
+  is worse than its absence. That stance was right and it is kept.
 
-* reintroduce persistent system state that survives a crash and a reboot,
-* require the notarized-helper install flow, an admin prompt, and an uninstall path for it,
-* and make the honest answer to "what happens if this app breaks" much longer.
+## What this changes, and what it does not
 
-That is `DESIGN.md` §12 **T3** in substance: shipping a root daemon is a liability decision the
-human must make explicitly. It is being escalated rather than decided here, and the toggle is
-not being shipped as a control that silently does nothing.
+It does **not** reverse 0002. The lid mechanism — the entire reason this product exists — stays
+Tier 1, unprivileged, with a kernel variable that a reboot clears unconditionally. The helper is
+an **island**: it exists only for one setting, only after an explicit opt-in, and it can be
+removed by unticking one box.
 
-## What is being done meanwhile
+It does change the sentence "Lidwing needs no privileges at all" into "Lidwing needs no
+privileges unless you ask it for Low Power Mode, and it tells you before you do". That is a
+longer sentence and still a true one, which is the point.
 
-1. **The claim is being turned into a measurement.** `docs/human-checklist.md` **H9** is one
-   command that settles it in thirty seconds on the owner's Mac: run `pmset -b lowpowermode 1`
-   as a normal user and report what it says. Every source above is a document; none of them is
-   this repository having run it. If it turns out an ordinary user *can* write it, this whole
-   record is void and the toggle ships as specified in 0004.
-2. **No half-toggle.** A checkbox that appears to engage Low Power Mode and does not is worse
-   than its absence, and worse than the escalation.
+## Shipped behaviour
 
-## The options, for the owner
+From 0004, unchanged except for the default:
 
-| | What ships | Cost |
-|---|---|---|
-| **A** | Nothing. Low Power Mode is dropped, and the README says Lidwing writes no system settings at all. | Loses a feature the owner asked for twice. |
-| **B** | A one-time, opt-in prompt that opens System Settings ▸ Battery at the right pane, and remembers the preference. Lidwing never writes the setting; the user does, once. | Honest and unprivileged, but it is a manual step, and it cannot restore the old value on lid open. |
-| **C** | The privileged helper from `ADDENDUM.md` §W4, with the full snapshot/restore ledger and per-power-source handling from 0004. | Root. Reverses the basis of decision 0002. |
+* Engaged **only** on battery **and** only while the lid is closed. On AC it is never engaged:
+  there is nothing to save, so the slowdown would be pure loss.
+* Written **per power source** (`-b` and `-c` held separately). macOS stores Low Power Mode
+  separately for battery and for AC; collapsing them silently destroys a choice the user made.
+* Snapshot before write, restore exactly what was found, and never write a value already in
+  place. On the owner's own Mac `lowpowermode` is already `1` on both sources, so a naive
+  "restore the default" would undo his setup — there, we write nothing at all.
+* Re-read at restore time. If the value is no longer what *we* set, the user or another app
+  changed it after us: leave it alone and record that we did.
 
-No option is being taken unilaterally. **B** is the only one implementable without reversing an
-architectural decision, and even B is a product choice about how much manual work is acceptable.
+## UI copy
+
+**No numbers.** The label warns in plain words that the mode trades speed for battery life.
+
+* Checkbox — `Save battery while the lid is closed`
+* Explanation — `Slows your Mac down to use less battery. Your agent will take longer to finish.`
+* The privilege line, in the row, before any click —
+  `Turning this on asks for an administrator password and installs a small helper. Nothing else
+  in Lidwing needs one.`
+* Off state, stated as the property it is —
+  `Lidwing has not asked for any privileges on this Mac.`
+
+## Verification
+
+`docs/human-checklist.md` **H9** still stands and is now worth more, not less: it is the
+thirty-second command that confirms the premise this whole decision rests on. If an ordinary
+user turns out to be able to write `lowpowermode` without root, the helper is unnecessary and
+this decision should be revisited immediately.
