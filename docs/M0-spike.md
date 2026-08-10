@@ -79,6 +79,23 @@ to a hundred and twenty, open it. It disarms itself.
 `max_gap_s` in single digits and both deltas `0`. If the Mac slept, you will see the login
 window when you open the lid and the verdict will say `FAIL` with the gap in seconds.
 
+The gap is measured from `wingprobe`'s own one-second heartbeat, not the script's
+sixty-second one — a two-minute run has only two of the latter, and a gap measured from two
+samples is not a measurement.
+
+**If it fails, the interesting question is *which kind* of failure it is,** and the script says
+where to look:
+
+| Check | If it says | Then |
+|---|---|---|
+| `verify.txt` | the user client did not open | The mechanism is gone on this OS. That is trigger **T6**, not T1. |
+| `probe.log` | `NOT VERIFIED` after arming | The write returned success and the machine never changed. This is the exact case the whole product's verification design exists for. |
+| `pmset-log.txt` | a sleep with reason `Clamshell` | The bit did not hold. This is the T1 case. |
+| `pmset-log.txt` | a sleep with reason `Low Power` or `Thermal` | The safety net fired, which is a *pass* for the mechanism and a note about the machine. |
+
+A run where the bit never took effect and a run where it took effect and the Mac slept anyway
+are different results, and only the second one ends the product.
+
 Either way, send me the directory it prints. **The raw logs are the result; the verdict line is
 just arithmetic over them.**
 

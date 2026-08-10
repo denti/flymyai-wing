@@ -223,18 +223,36 @@ AFTER_SLEEP="$(sleep_count "$OUT/pmset-stats.after.txt")"
 AFTER_DARK="$(dark_count  "$OUT/pmset-stats.after.txt")"
 pmset -g log > "$OUT/pmset-log.txt" 2>&1 || true
 
-MAX_GAP="$(awk '
-  BEGIN { prev = 0; max = 0 }
-  /^#/ { next }
-  {
-    # heartbeat lines start with an ISO-8601 UTC timestamp
-    cmd = "date -u -j -f %Y-%m-%dT%H:%M:%SZ " $1 " +%s"
-    cmd | getline t
-    close(cmd)
-    if (prev > 0 && t - prev > max) max = t - prev
-    prev = t
-  }
-  END { print max }' "$HEARTBEAT")"
+# The largest wall-clock gap between consecutive heartbeats. A sleep shows up as a gap; this
+# is the measurement, and everything else in this script is scaffolding around it.
+max_gap_of() {
+  awk '
+    BEGIN { prev = 0; max = 0 }
+    /^#/ { next }
+    NF == 0 { next }
+    {
+      cmd = "date -u -j -f %Y-%m-%dT%H:%M:%SZ " $1 " +%s 2>/dev/null"
+      cmd | getline t
+      close(cmd)
+      if (t > 0) {
+        if (prev > 0 && t - prev > max) max = t - prev
+        prev = t
+      }
+    }
+    END { print max + 0 }' "$1"
+}
+
+# Prefer wingprobe's own one-second log: on a two-minute run the sixty-second heartbeat has
+# only two samples, and a gap measured from two samples is not a measurement.
+if [ -s "$OUT/probe-heartbeat.log" ]; then
+  MAX_GAP="$(max_gap_of "$OUT/probe-heartbeat.log")"
+  GAP_SOURCE="wingprobe 1s heartbeat"
+  GAP_BUDGET=5
+else
+  MAX_GAP="$(max_gap_of "$HEARTBEAT")"
+  GAP_SOURCE="shell 60s heartbeat"
+  GAP_BUDGET=90
+fi
 
 TICKS="$(grep -c . "$HEARTBEAT" || echo 0)"
 EXPECTED_TICKS=$(( DURATION / 60 ))
@@ -256,8 +274,13 @@ fi
 
 VERDICT=PASS
 REASONS=""
-if [ "${MAX_GAP:-999}" -gt 90 ]; then
-  VERDICT=FAIL; REASONS="$REASONS heartbeat gapped ${MAX_GAP}s;"
+if [ "${MAX_GAP:-999}" -gt "$GAP_BUDGET" ]; then
+  VERDICT=FAIL; REASONS="$REASONS heartbeat gapped ${MAX_GAP}s (budget ${GAP_BUDGET}s);"
+fi
+# wingprobe judges itself against the same three signals. If it disagrees with the arithmetic
+# here, that disagreement is itself a reason not to trust the run.
+if [ "$MECHANISM" = a ] && [ "${PROBE_STATUS:-0}" -ne 0 ]; then
+  VERDICT=FAIL; REASONS="$REASONS wingprobe reported failure (exit $PROBE_STATUS);"
 fi
 if [ "$SLEEP_DELTA" != "0" ]; then
   VERDICT=FAIL; REASONS="$REASONS Sleep Count delta=$SLEEP_DELTA;"
@@ -274,7 +297,7 @@ fi
   echo "verdict:        $VERDICT"
   echo "mechanism:      $MECHANISM"
   echo "duration_s:     $DURATION"
-  echo "max_gap_s:      ${MAX_GAP:-?}"
+  echo "max_gap_s:      ${MAX_GAP:-?}   (from $GAP_SOURCE, budget ${GAP_BUDGET}s)"
   echo "heartbeats:     $TICKS of ~$EXPECTED_TICKS expected"
   echo "sleep_delta:    $SLEEP_DELTA"
   echo "darkwake_delta: $DARK_DELTA"
@@ -287,5 +310,15 @@ fi
 } | tee "$OUT/verdict.txt"
 
 say "=== $VERDICT ==="
+if [ "$VERDICT" = FAIL ]; then
+  say ""
+  say "Before concluding the mechanism does not work, check these in the output:"
+  say "  * verify.txt        - did the user client open at all?"
+  say "  * probe.log         - did AppleClamshellCausesSleep flip to No within 2s?"
+  say "  * pmset-log.txt     - what reason does the kernel give for the sleep?"
+  say "  * ioreg.before/after- was the machine stock before the run started?"
+  say "A run where the bit never took effect is a different result from one where it took"
+  say "effect and the Mac slept anyway, and the second is the one that ends the product."
+fi
 say "Send the whole directory: $OUT"
 [ "$VERDICT" = PASS ] && exit 0 || exit 1
