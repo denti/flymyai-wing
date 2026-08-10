@@ -580,6 +580,35 @@ to be a deliberate decision somebody defends.
 
 ---
 
+## Round 11 — 2026-08-10, auditing the change I had just made
+
+Scope: arming at launch, an hour old, already green and already pushed.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 11.1 | **It would arm a Mac with no lid.** A desktop at launch and a laptop whose lid driver has not reported yet are indistinguishable: both have no `AppleClamshellState` key, which is `.unknown`. That is deliberately *not* collapsed into `.noLid`, because doing so would disable the product at every login on a real laptop - and `SafetyPolicy.refusalReason` refuses on `.noLid` only. So on a Mac mini, arming at launch would take a genuine idle-sleep assertion and hold the machine awake for the whole duration lease, unasked, for a feature that machine cannot use. | High | The launch arm waits until the lid is known, and is honoured the moment it reports. Three tests; the mutation that removes the guard produces **7** failures. |
+
+The finding that matters more than the fix: I introduced this an hour earlier, in a change whose
+own tests were green, whose CI was green on seven jobs, and which I had already pushed. It was
+found by asking "what did I just make worse", which is a different question from "does this work".
+
+### Removed rather than kept
+
+`onLidDeterminedAbsent` gained a line clearing the deferred intent. Deleting that line changed
+nothing any test could see, because `onArmAtLaunch`'s own `state == .idle` guard already provides
+the property - a machine with no lid is `.unsupported`. So it went. A line that cannot fail is a
+line that only looks like a safeguard.
+
+The behaviour left behind is deliberate and is written down in the test: if the no-lid
+determination is later reversed by a real clamshell report, the machine returns to `.idle` and
+the launch intent is honoured then, which is the right answer - the Mac does have a lid after all.
+
+**Round 11 verdict:** one high-severity defect, in code that was green, reviewed and shipped.
+
+---
+
 ## Round 10 — 2026-08-10, the script that decides the architecture
 
 Scope: `spike/m0-run.sh`. Method: the lens the last two rounds sharpened - where can this report

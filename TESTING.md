@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **251** |
+| Tests | **254** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -82,9 +82,10 @@ its own bookkeeping:
 | 32 | Arming at launch is allowed to prompt | the v0.1.0 crash class returning by the front door, on the path that now runs on every launch | **5** |
 | 33 | It arms itself while the machine needs repair | writing on top of a bit somebody else set, instead of standing down | **1** |
 | 34 | Foreign holders ignored when deciding to arm | fighting another keep-awake tool for a global, reference-count-free bit | **6** |
+| 35 | It arms itself before knowing the Mac has a lid | a Mac mini held awake for the whole duration lease, for a feature it cannot use. Found by auditing my own change, not by a user | **7** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

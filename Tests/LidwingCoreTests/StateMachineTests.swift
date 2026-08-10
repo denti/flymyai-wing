@@ -614,6 +614,68 @@ final class StateMachineTests: XCTestCase {
         XCTAssertNotEqual(machine.state, .armed, "the lease never started")
     }
 
+    /// A desktop at launch is indistinguishable from a laptop whose lid driver has not reported
+    /// yet: both have no `AppleClamshellState` key, which is `.unknown`, and `.unknown` is
+    /// deliberately not collapsed into `.noLid` because doing so would disable the product at
+    /// every login on a real laptop.
+    ///
+    /// Arming there would take a genuine idle-sleep assertion and hold a Mac mini awake for the
+    /// whole duration lease, for a feature that machine cannot use. Waiting costs nothing: the
+    /// lid driver reports within moments on a laptop, and the ten-second determination settles
+    /// the desktop case.
+    func testItDoesNotArmItselfBeforeItKnowsThereIsALid() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.lidState = .unknown
+        machine.handle(.launch)
+
+        let effects = machine.handle(.armAtLaunch)
+
+        XCTAssertTrue(system.assertionWrites.isEmpty,
+                      "held a machine awake before knowing it had a lid to close")
+        XCTAssertTrue(system.clamshellWrites.isEmpty)
+        XCTAssertEqual(machine.state, .idle)
+        XCTAssertTrue(effects.isEmpty)
+    }
+
+    /// ...and once the lid does report, the intent it was holding is honoured.
+    func testTheDeferredArmHappensWhenTheLidReports() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.lidState = .unknown
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        XCTAssertEqual(machine.state, .idle)
+
+        system.lidState = .open
+        machine.handle(.lidChanged(.open))
+
+        XCTAssertEqual(machine.state, .arming, "the deferred arm never happened")
+        XCTAssertEqual(system.lastClamshellWrite, true)
+    }
+
+    /// On a Mac with no lid the deferred intent never fires.
+    ///
+    /// There is no separate flag-clearing step for this, and there was: it turned out to be
+    /// redundant with `onArmAtLaunch`'s own `state == .idle` guard, since a machine with no lid
+    /// is `.unsupported`. Deleting that line changed nothing any test could see, so it went -
+    /// a line that cannot fail is a line that only looks like a safeguard.
+    ///
+    /// The remaining behaviour is deliberate: if the no-lid determination is later reversed by
+    /// a real clamshell report, the machine returns to `.idle` and the launch intent is honoured
+    /// then. That is the right answer - the Mac does have a lid after all.
+    func testTheDeferredArmIsForgottenOnAMachineWithNoLid() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.lidState = .unknown
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+
+        system.lidState = .noLid
+        machine.handle(.lidDeterminedAbsent)
+        XCTAssertEqual(machine.state, .unsupported)
+
+        machine.handle(.lidChanged(.open))
+        XCTAssertTrue(system.clamshellWrites.isEmpty, "armed a machine that has no lid")
+    }
+
     func testLaunchWithALedgerFromAnotherProcessStandsDown() throws {
         let (system, ledger, _, _, machine) = TestFixture.harness()
         system.clamshellCausesSleep = false

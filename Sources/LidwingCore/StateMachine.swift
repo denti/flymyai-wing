@@ -59,6 +59,11 @@ public final class StateMachine {
     /// first arm that verifies. Deliberately not persisted: if the app never manages a verified
     /// arm, the check is still pending on the next launch, which is the correct answer.
     internal var pendingOSRecheck: (from: String, to: String)?
+
+    /// Lidwing wanted to arm itself at launch but did not yet know whether this Mac has a lid.
+    /// Consumed the moment the lid driver reports, dropped if the machine turns out to have no
+    /// lid at all. Not persisted: it is an intent about *this* launch.
+    internal var deferredArmAtLaunch = false
     /// Last known lid position, so a chime fires on the transition and not on every one of the
     /// four non-lid events that also deliver a clamshell notification.
     internal var lidWasClosed = false
@@ -153,6 +158,13 @@ public final class StateMachine {
         case .lidChanged(let lid):
             let justClosed = (lid == .closed && lidWasClosed == false)
             lidWasClosed = (lid == .closed)
+            // The lid has reported, so a launch-time arm that was waiting for exactly this can
+            // go ahead now.
+            if deferredArmAtLaunch, lid != .noLid {
+                deferredArmAtLaunch = false
+                let armed = onArmAtLaunch()
+                return armed + onReassertTrigger(lidJustClosed: justClosed)
+            }
             return onReassertTrigger(lidJustClosed: justClosed)
 
         case .lidDeterminedAbsent:
