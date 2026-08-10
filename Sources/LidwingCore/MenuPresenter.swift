@@ -48,93 +48,114 @@ public struct MenuPresenter {
     }
 
     public static func content(for snapshot: Snapshot) -> Content {
-        let toggleTitle = "Keep Awake with the Lid Closed"
+        let toggleTitle = Strings.text("menu.toggle", "Keep Awake with the Lid Closed")
 
         switch snapshot.state {
         case .unsupported:
-            return Content(headline: "This Mac has no lid",
-                           detail: "There is no lid-close sleep to prevent here.",
+            return Content(headline: Strings.text("menu.nolid", "This Mac has no lid"),
+                           detail: Strings.text("menu.nolid.detail",
+                                                "There is no lid-close sleep to prevent here."),
                            toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: false,
                            accessibilityValue: "Unsupported on this Mac")
 
         case .repair:
-            return Content(headline: "Something is keeping this Mac awake",
-                           detail: "It may be left over from Lidwing. Click Repair to put it back.",
+            return Content(headline: Strings.text("menu.repair",
+                                                  "Something is keeping this Mac awake"),
+                           detail: Strings.text("menu.repair.detail",
+                                                "It may be left over from Lidwing. "
+                                                + "Click Repair to put it back."),
                            toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: false,
                            accessibilityValue: "Needs repair")
 
         case .failed:
-            let when = snapshot.lastFailureAt.map { clock($0) }
-            return Content(headline: when.map { "Your Mac slept at \($0) despite protection" }
-                                ?? "Lidwing could not protect this Mac",
-                           detail: "See Diagnostics. Protection is not active.",
+            let headline = snapshot.lastFailureAt.map {
+                Strings.text("menu.failed", "Your Mac slept at %1$@ despite protection", clock($0))
+            } ?? Strings.text("menu.failed.noTime", "Lidwing could not protect this Mac")
+            return Content(headline: headline,
+                           detail: Strings.text("menu.failed.detail",
+                                                "See Diagnostics. Protection is not active."),
                            toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: true,
                            accessibilityValue: "Failed, this Mac is not protected")
 
         case .idle:
             if let holder = snapshot.foreignHolder {
-                return Content(headline: "Another app is keeping this Mac awake",
-                               detail: "\(holder.name) (pid \(holder.pid)) - Lidwing stood down.",
+                return Content(headline: Strings.text("menu.foreign",
+                                                      "Another app is keeping this Mac awake"),
+                               detail: foreignDetail(holder),
                                toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: true,
                                accessibilityValue: "Off, another app is keeping this Mac awake")
             }
-            return Content(headline: "Off - your Mac sleeps normally",
+            return Content(headline: Strings.text("menu.off", "Off - your Mac sleeps normally"),
                            detail: power(snapshot),
                            toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: true,
                            accessibilityValue: "Off")
 
         case .arming:
-            return Content(headline: "Checking that it worked\u{2026}",
-                           detail: "Lidwing never says it is on until your Mac agrees.",
+            return Content(headline: Strings.text("menu.arming", "Checking that it worked\u{2026}"),
+                           detail: Strings.text("menu.arming.detail",
+                                                "Lidwing never says it is on until your Mac agrees."),
                            toggleTitle: toggleTitle, toggleChecked: true, toggleEnabled: true,
                            accessibilityValue: "Turning on")
 
         case .disarming:
-            return Content(headline: "Putting your sleep setting back\u{2026}",
+            return Content(headline: Strings.text("menu.disarming",
+                                                  "Putting your sleep setting back\u{2026}"),
                            detail: nil,
                            toggleTitle: toggleTitle, toggleChecked: false, toggleEnabled: false,
                            accessibilityValue: "Turning off")
 
         case .armed, .degraded:
-            var headline = "Awake - you can close the lid"
-            if let agent = snapshot.agentRunning {
-                headline = "Awake - \(agent) is running"
-            }
-            var detail = power(snapshot)
-            var accessibility = "On, keeping this Mac awake"
-
-            if snapshot.state == .degraded {
-                if snapshot.thermal >= .serious {
-                    headline = "Awake - your Mac is running hot"
-                    detail = "Lidwing turns off if it gets hotter."
-                    accessibility = "On, this Mac is running hot"
-                } else if let percent = snapshot.batteryPercent,
-                          percent <= snapshot.floorPercent + SafetyPolicy.earlyWarningMargin {
-                    headline = "Awake - battery \(percent)%"
-                    detail = "Lidwing turns off at \(snapshot.floorPercent)%."
-                    accessibility = "On, battery \(percent) percent"
-                } else if let holder = snapshot.foreignHolder {
-                    detail = "\(holder.name) (pid \(holder.pid)) is also holding this Mac awake."
-                }
-            }
-            if let elapsed = snapshot.armedSince.map({ snapshot.now.timeIntervalSince($0) }) {
-                accessibility += ", \(spokenDuration(Int(elapsed))) so far"
-            }
-            return Content(headline: headline, detail: detail,
-                           toggleTitle: toggleTitle, toggleChecked: true, toggleEnabled: true,
-                           accessibilityValue: accessibility)
+            return protecting(snapshot, toggleTitle: toggleTitle)
         }
+    }
+
+    /// The armed and degraded states, which differ only in what they have to warn about.
+    private static func protecting(_ snapshot: Snapshot, toggleTitle: String) -> Content {
+        var headline = Strings.text("menu.awake", "Awake - you can close the lid")
+        if let agent = snapshot.agentRunning {
+            headline = Strings.text("menu.awake.agent", "Awake - %1$@ is running", agent)
+        }
+        var detail = power(snapshot)
+        var accessibility = "On, keeping this Mac awake"
+
+        if snapshot.state == .degraded {
+            if snapshot.thermal >= .serious {
+                headline = Strings.text("menu.hot", "Awake - your Mac is running hot")
+                detail = Strings.text("menu.hot.detail", "Lidwing turns off if it gets hotter.")
+                accessibility = "On, this Mac is running hot"
+            } else if let percent = snapshot.batteryPercent,
+                      percent <= snapshot.floorPercent + SafetyPolicy.earlyWarningMargin {
+                headline = Strings.text("menu.battery", "Awake - battery %1$lld%%", Int64(percent))
+                detail = Strings.text("menu.battery.detail", "Lidwing turns off at %1$lld%%.",
+                                      Int64(snapshot.floorPercent))
+                accessibility = "On, battery \(percent) percent"
+            } else if let holder = snapshot.foreignHolder {
+                detail = foreignDetail(holder)
+            }
+        }
+        if let elapsed = snapshot.armedSince.map({ snapshot.now.timeIntervalSince($0) }) {
+            accessibility += ", \(spokenDuration(Int(elapsed))) so far"
+        }
+        return Content(headline: headline, detail: detail,
+                       toggleTitle: toggleTitle, toggleChecked: true, toggleEnabled: true,
+                       accessibilityValue: accessibility)
+    }
+
+    private static func foreignDetail(_ holder: ForeignHolder) -> String {
+        Strings.text("menu.foreign.detail", "%1$@ (pid %2$lld) - Lidwing stood down.",
+                     holder.name, Int64(holder.pid))
     }
 
     private static func power(_ snapshot: Snapshot) -> String? {
         var parts: [String] = []
         if let remaining = snapshot.remainingSeconds, remaining > 0 {
-            parts.append("\(compactDuration(remaining)) left")
+            parts.append(Strings.text("detail.left", "%1$@ left", compactDuration(remaining)))
         }
         if let percent = snapshot.batteryPercent {
-            parts.append("battery \(percent)%")
+            parts.append(Strings.text("detail.battery", "battery %1$lld%%", Int64(percent)))
         }
-        parts.append(snapshot.onAC ? "plugged in" : "on battery")
+        parts.append(snapshot.onAC ? Strings.text("detail.pluggedIn", "plugged in")
+                                   : Strings.text("detail.onBattery", "on battery"))
         return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
     }
 

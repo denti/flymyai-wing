@@ -241,21 +241,34 @@ public enum ArmRefusal: Equatable, Sendable {
     public var sentence: String {
         switch self {
         case .noLid:
-            return "This Mac has no lid, so there is no lid-close sleep to prevent."
+            return Strings.text("refuse.noLid",
+                                "This Mac has no lid, so there is no lid-close sleep to prevent.")
         case .unsupportedOS:
-            return "This version of macOS changed how sleep works. Lidwing needs an update."
+            return Strings.text("refuse.unsupported",
+                                "This version of macOS changed how sleep works. "
+                                + "Lidwing needs an update.")
         case .batteryTooLow:
-            return "The battery is already at or below your stop limit. Plug in and try again."
+            return Strings.text("refuse.batteryLow",
+                                "The battery is already at or below your stop limit. "
+                                + "Plug in and try again.")
         case .tooHot:
-            return "This Mac is too hot right now. Let it cool down and try again."
+            return Strings.text("refuse.tooHot",
+                                "This Mac is too hot right now. Let it cool down and try again.")
         case .foreignHolder(let holder):
-            return "Another app is already keeping this Mac awake: \(holder.name) (pid \(holder.pid))."
+            return Strings.text("refuse.foreign",
+                                "Another app is already keeping this Mac awake: %1$@ (pid %2$lld).",
+                                holder.name, Int64(holder.pid))
         case .externalDisplayOnAC:
-            return "macOS already does this for you while an external display is attached on power."
+            return Strings.text("refuse.externalDisplay",
+                                "macOS already does this for you while an external display "
+                                + "is attached on power.")
         case .watchdogUnavailable:
-            return "Lidwing could not start its safety watchdog, so it will not keep this Mac awake."
+            return Strings.text("refuse.watchdog",
+                                "Lidwing could not start its safety watchdog, so it will not "
+                                + "keep this Mac awake.")
         case .notInApplications:
-            return "Move Lidwing to your Applications folder first."
+            return Strings.text("refuse.notInApplications",
+                                "Move Lidwing to your Applications folder first.")
         }
     }
 }

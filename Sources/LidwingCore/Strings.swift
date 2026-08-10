@@ -74,6 +74,8 @@ public enum StringKey {
         StringEntry("menu.disarming", "Putting your sleep setting back\u{2026}", "Shown while releasing."),
         StringEntry("menu.failed", "Your Mac slept at %1$@ despite protection",
          "%1$@ is a wall-clock time such as 03:12. The worst thing this app can report."),
+        StringEntry("menu.failed.noTime", "Lidwing could not protect this Mac",
+         "Failure header when the exact time of the sleep is not known."),
         StringEntry("menu.failed.detail", "See Diagnostics. Protection is not active.", ""),
         StringEntry("menu.foreign", "Another app is keeping this Mac awake",
          "Something else holds a sleep assertion; Lidwing stood down rather than fighting it."),

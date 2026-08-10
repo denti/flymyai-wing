@@ -45,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak statusItem] in
             statusItem?.refresh()
         }
+        // Pick the user's language before anything draws. English is the fallback, and a key
+        // with no translation renders in English rather than vanishing.
+        Strings.localiser = Translations.localiser(for: Locale.preferredLanguages)
+
         MainMenu.install(into: NSApplication.shared)
         coordinator.start()
         statusItem.refresh()

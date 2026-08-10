@@ -99,3 +99,86 @@ final class StringsTests: XCTestCase {
         XCTAssertEqual(Strings.text("does.not.exist", "Fallback text"), "Fallback text")
     }
 }
+
+/// A translation that silently loses a key shows English in one menu row and Russian in the
+/// next, which reads as a bug in the app rather than a gap in the catalogue.
+final class TranslationTests: XCTestCase {
+
+    override func tearDown() {
+        Strings.localiser = nil
+        super.tearDown()
+    }
+
+    func testEveryCatalogueCoversEveryKey() {
+        let expected = Set(StringKey.all.map(\.key))
+        for (language, catalogue) in Translations.catalogues {
+            let provided = Set(catalogue.keys)
+            let missing = expected.subtracting(provided).sorted()
+            XCTAssertTrue(missing.isEmpty, "\(language) is missing: \(missing.joined(separator: ", "))")
+
+            let extra = provided.subtracting(expected).sorted()
+            XCTAssertTrue(extra.isEmpty,
+                          "\(language) has keys nothing reads: \(extra.joined(separator: ", "))")
+        }
+    }
+
+    /// A translation that drops or renumbers a placeholder produces a crash or a wrong number
+    /// at runtime, in a string that is usually about a safety limit.
+    func testEveryTranslationKeepsItsPlaceholders() {
+        let english = Dictionary(uniqueKeysWithValues: StringKey.all.map { ($0.key, $0.english) })
+        for (language, catalogue) in Translations.catalogues {
+            for (key, translated) in catalogue {
+                guard let source = english[key] else { continue }
+                XCTAssertEqual(placeholders(in: translated), placeholders(in: source),
+                               "\(language)/\(key): placeholders differ")
+            }
+        }
+    }
+
+    private func placeholders(in text: String) -> Set<String> {
+        var found: Set<String> = []
+        var index = text.startIndex
+        while let percent = text[index...].firstIndex(of: "%") {
+            let after = text.index(after: percent)
+            guard after < text.endIndex else { break }
+            if text[after] == "%" {
+                index = text.index(after: after)
+                continue
+            }
+            if let dollar = text[after...].firstIndex(of: "$"),
+               text.distance(from: after, to: dollar) <= 2 {
+                let end = text.index(dollar, offsetBy: 1, limitedBy: text.endIndex) ?? text.endIndex
+                var type = String(text[dollar..<end])
+                // %1$lld and %1$@ - keep enough to distinguish a number from a string.
+                var cursor = end
+                while cursor < text.endIndex, "ld@".contains(text[cursor]) {
+                    type.append(text[cursor])
+                    cursor = text.index(after: cursor)
+                }
+                found.insert(String(text[percent..<after]) + type)
+                index = cursor
+            } else {
+                index = after
+            }
+        }
+        return found
+    }
+
+    func testLanguageMatchingIgnoresRegionAndCase() {
+        XCTAssertNotNil(Translations.catalogue(for: ["ru-RU"]))
+        XCTAssertNotNil(Translations.catalogue(for: ["ru_RU"]))
+        XCTAssertNotNil(Translations.catalogue(for: ["RU"]))
+        XCTAssertNotNil(Translations.catalogue(for: ["fr", "ru"]), "should fall through to ru")
+        XCTAssertNil(Translations.catalogue(for: ["fr-CA"]))
+        XCTAssertNil(Translations.catalogue(for: []))
+    }
+
+    func testTheRussianMenuActuallyRenders() {
+        Strings.localiser = Translations.localiser(for: ["ru"])
+        XCTAssertEqual(Strings.text("menu.quit", "Quit Lidwing"), "Завершить Lidwing")
+        XCTAssertEqual(Strings.text("menu.battery", "Awake - battery %1$lld%%", Int64(23)),
+                       "Не спит - батарея 23%")
+        // A key with no translation still renders in English rather than vanishing.
+        XCTAssertEqual(Strings.text("not.translated", "English text"), "English text")
+    }
+}
