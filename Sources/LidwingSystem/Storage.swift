@@ -31,14 +31,17 @@ public enum SupportDirectory {
         // than to a ledger somewhere unexpected.
         var status = stat()
         if lstat(path, &status) == 0 {
-            if status.st_mode & S_IFMT == S_IFLNK { return false }
-            guard status.st_mode & S_IFMT == S_IFDIR else { return false }
+            // Everything through `Int`. `st_mode` is `mode_t` (UInt16) while `S_IFMT` and
+            // friends import as `Int32`, and mixing them is a type error rather than a warning.
+            let kind = Int(status.st_mode) & Int(S_IFMT)
+            if kind == Int(S_IFLNK) { return false }
+            guard kind == Int(S_IFDIR) else { return false }
             let mode = Int(status.st_mode) & 0o7777
             if StatePermissions.isTooOpen(mode) {
                 // Repair rather than refuse: this is our own directory, the user did not
                 // choose its mode, and refusing would disable the product over something we
                 // can simply fix.
-                chmod(path, mode_t(StatePermissions.tightened(mode)))
+                _ = chmod(path, mode_t(StatePermissions.tightened(mode)))
             }
             return true
         }

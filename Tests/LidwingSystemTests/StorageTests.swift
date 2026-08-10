@@ -83,12 +83,12 @@ final class StorageTests: XCTestCase {
         let path = sandbox.appendingPathComponent("s.sock").path
         // A umask that would otherwise leave the socket group- and world-readable.
         let previous = umask(0o000)
-        defer { umask(previous) }
+        defer { _ = umask(previous) }
 
         guard let descriptor = UnixSocket.listen(path: path) else {
             throw XCTSkip("could not bind a socket in the sandbox")
         }
-        defer { close(descriptor); unlink(path) }
+        defer { _ = close(descriptor); _ = unlink(path) }
 
         var status = stat()
         XCTAssertEqual(lstat(path, &status), 0)

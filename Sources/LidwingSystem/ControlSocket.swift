@@ -105,12 +105,12 @@ public enum UnixSocket {
                 bind(descriptor, generic, size)
             }
         }
-        umask(previousMask)
+        _ = umask(previousMask)
         guard bound == 0 else {
             close(descriptor)
             return nil
         }
-        chmod(path, mode_t(StatePermissions.fileMode))
+        _ = chmod(path, mode_t(StatePermissions.fileMode))
         guard Darwin.listen(descriptor, backlog) == 0 else {
             close(descriptor)
             unlink(path)
