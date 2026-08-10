@@ -380,3 +380,68 @@ local gate and CI, and it has been seen red.
 **Round 7 verdict:** one defect in the test infrastructure, found by CI behaving oddly rather
 than by CI going red — and it was only ever going to appear on the platform the product
 actually ships to. Plus a whole category of script defect that nothing had been looking for.
+
+---
+
+## Round 8 — 2026-08-10, the specification beside the code
+
+Scope: `CRAFT.md` §8 (accessibility) and §11 (the fifty-item antipattern list), read line by
+line against the implementation, plus the packaging scripts against the runtime.
+
+The method is the least clever one available: open the specification and the code side by side
+and check each claim. It is also the most productive round so far, which says something
+uncomfortable — six earlier rounds read this code for correctness and none of them read it
+against the document that defines what "done" means for the visible surface.
+
+### The governing question, answered
+
+Unchanged, and untouched by this round: none of these findings can leave a Mac unable to sleep.
+They are all failures of the second promise rather than the first — the product telling the
+user something that is not true, or failing to tell them something that is. Which is why they
+are worth a round: a mechanism nobody can hear, see or verify is not a mechanism anyone can
+trust.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 8.1 | **Three of the five Settings controls had no help text and no tooltip.** `withExplanation` attached both behind `if let control = view as? NSButton`. `NSSegmentedControl` and `NSPopUpButton` are not `NSButton`s, and `row()` made it worse by wrapping the control in a stack view and handing *that* to the cast, which could never match. The two rows built that way are the battery floor and the duration limit — the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is exactly why nobody noticed. | High | Attach to any `NSControl`, before wrapping. The visible label is now set on the control itself: without it a pop-up reached by Tab or VoiceOver announces "20 per cent" with no hint of what it governs. |
+| 8.2 | **Nothing subscribed to `accessibilityDisplayOptionsDidChangeNotification`.** `refresh()` read Increase Contrast correctly — but it only runs on a state change, and this app is designed so the state does not change while nothing is happening. A user who turned the accommodation on while Lidwing sat idle kept the dimmed glyph for the rest of the session. The spec says "read live, never once at launch"; the code read it live and then never looked again. | Medium | Subscribe, and re-render on every fire. |
+| 8.3 | **`flash()` ignored Reduce Motion**, blinking the status item six times at 4 Hz. | Medium | Under Reduce Motion it highlights once and holds. Not silence: `flash()` is the recovery path for someone who relaunched from Finder and cannot find the icon, and Reduce Motion means do not move, not give this user no feedback. |
+| 8.4 | **The status-item tooltip was the menu headline**, so hovering an unfamiliar icon said "Off - your Mac sleeps normally". The glyph carries the state and so does `accessibilityValue`; a tooltip appears before the click and should say what will happen. | Low | One tooltip per state, verb first, no ending period, in both languages. Tested in the portable module. |
+| 8.5 | **The Settings window opened with focus on nothing** (§8.4). | Low | `initialFirstResponder` on the mode control. |
+| 8.6 | **Antipattern 38 — break after a macOS update and stay broken silently.** Nothing stored or compared the OS build. This product rests on one undocumented `IOPMrootDomain` selector, so it is a worse candidate for this failure than Rectangle or Ice, and its failure mode is the quiet one. | High | Remember the build on which an arm last *verified*, notice at launch when it differs, and let the next verified arm report it. Deliberately **no** launch-time probe: `clamshellCausesSleep` and `sleepDisabled` are both `Bool?` where nil legitimately means "key absent", so absence proves nothing, and the only real proof is arming — which this product does not do unasked. |
+| 8.7 | **Antipattern 37 — a feature silently rotting.** `ChimePlayer` named one system sound per chime and returned silently if the file was absent. No log, no warning, sound checkbox still in Settings. Worse here than in the app whose review named it: with the lid shut, sound is the **only** channel, so a rotted chime takes the lid-close confirmation with it and the user finds out by opening a laptop that slept three hours ago. | High | Fallbacks per chime, a self-check that names what is missing (in Settings only when wrong, in diagnostics always — "Sound  ok" rules out a theory for someone who cannot see the machine), and a Play button that plays even when the sound preference is off, because the question it answers is "does this work on my Mac". |
+| 8.8 | **The build script, the signing script and the runtime named the same files in three unconnected places.** A rename on one side ships an app that launches, shows a menu, arms — and has no watchdog, the one component whose absence means a `kill -9` strands the machine until reboot. | Medium | `Scripts/check-bundle-contract.sh`, five positive controls, in the gate and in CI. |
+| 8.9 | **My own CI break**, included because it belongs in the record: `log.emit(.osChanged, …)` compiles nowhere — leading-dot lookup resolves against `LogEvent` and those events are static members of `LogCatalogue`. The local gate passed because **none of the Darwin targets compile on Linux**, which makes CI their only compiler and a six-minute round trip the price of every typo in them. | Medium | Fixed, plus a grep for this shape. The first version of that grep also matched `Observers.emit(.thermalChanged)` — a different and entirely correct method — and a check that fires on correct code gets switched off within a week, so it is anchored on the log receiver. |
+
+Two of the findings above were in checks I wrote *this round*, caught by their own positive
+controls: `check-bundle-contract.sh` aborted at the failing `grep` under `set -e` and exited 1
+having printed nothing (a crash, not a finding), and its workflow comparison was an unanchored
+substring match, so `ai.flymy.lidwing` matched `ai.flymy.lidwing2` and the drift control passed.
+A check whose positive control is not run is a decoration.
+
+### Findings, rejected
+
+| Finding | Why it was rejected |
+|---|---|
+| "Antipattern 8 — Differentiate Without Color needs handling for the WARNING state." | Already satisfied structurally, not by luck: every glyph is a template image, and template images cannot carry colour at all. The degraded state is a *shape* difference — solid wing plus a warning dot — and the menu's status line carries the same information in words. Adding a code path for a flag we already satisfy would be a code path nobody could ever see fail. |
+| "The self-check should confirm sound works on every launch, in the UI." | It reports in the UI only when something is wrong. A check that announces success on every launch is noise, and noise is precisely how the one real warning gets ignored six months later. Diagnostics is the exception, because it is read by someone who cannot see the machine. |
+| "`OSChangeWatch` should compare only the marketing version — a build bump is not a real change." | The opposite. A security update keeps the marketing version and changes only the build, and that update can ship a new kernel. Deciding what counts as "different enough" would be inventing a rule Apple never agreed to. |
+| "Add a launch-at-login checkbox while in the Settings window." | Out of scope for a round whose job was to check the spec against the code, and antipatterns 21–23 make it a feature with real requirements (never default-on, never a cached boolean, `SMAppService` only). It goes on the list as work, not as a fix smuggled into an audit. |
+| "The tooltip should also state the battery percentage, since the menu does." | A tooltip that changes every few minutes is a tooltip nobody reads twice. State that moves belongs in the menu, which is rebuilt on every open; the tooltip carries what will happen if you click. |
+
+### What this round could not check
+
+Every finding above is in AppKit code in an executable target, and CI has no window server. None
+of it is red anywhere, and none of it can be: `swift build` on macOS proves it compiles, not
+that a focus ring appears or that VoiceOver says anything. That is now `docs/human-checklist.md`
+H8, with the exact keys to press, the two controls to check first, and the live Increase Contrast
+test — six minutes of someone's attention, on the one part of this product that reading cannot
+verify.
+
+**Round 8 verdict:** nine defects, seven of them user-visible, none of them capable of stranding
+a Mac. The pattern worth naming: every one of them was invisible to the tests because the tests
+check what the code does, and these were all cases of the code doing something perfectly well
+for a case that never arrives — a cast that never matches, a notification never subscribed, a
+comparison never made.

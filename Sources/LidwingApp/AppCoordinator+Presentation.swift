@@ -203,8 +203,8 @@ extension AppCoordinator {
 
     func diagnosticsText() -> String {
         DiagnosticsReport.build(system: system, machine: machine, audit: audit,
-                                soundWarning: soundSelfCheckWarning,
-                                watchdogConnected: watchdog.isConnected)
+                                watchdogConnected: watchdog.isConnected,
+                                soundWarning: soundSelfCheckWarning)
     }
 
     static func architecture() -> String {

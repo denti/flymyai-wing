@@ -16,9 +16,9 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **168** |
+| Tests | **203** |
 | Failures | 0 |
-| Wall clock | 0.83 s |
+| Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
 
 Breakdown: StateMachine 40 · ClaudeSettingsPatch and CodexConfigPatch 23 · SafetyPolicy 17 ·
@@ -55,15 +55,31 @@ its own bookkeeping:
 | 5 | `ClaudeSettingsPatch.install` appends without removing our previous entry | a second hook on every install, and a duplicate notification for every event | **3** |
 | 6 | `CodexConfigPatch.install` writes our command without chaining | silently taking away a feature the user already had | **2** |
 | 7 | Repair calls `setClamshellSleepDisabled(false)` instead of `repairClamshellState()` | the original defect from audit round 3: the button reports success and changes nothing | **3** |
+| 8 | The status-item tooltip returns the menu headline | the defect audit round 8 replaced: hovering an unfamiliar icon restates the state instead of saying what a click does | **1** |
+| 9 | A tooltip gains an ending period | copy rules rotting one careless string at a time | **1** |
+| 10 | `.degraded` shares the calm armed tooltip | still protecting, but the one signal that a guard is warning is gone | **1** |
+| 11 | A Mac that slept while armed reads as ordinarily armed | the failure this product exists to prevent, made invisible | **2** |
+| 12 | The new OS build is recorded at launch rather than after a verified arm | claiming the mechanism was re-verified on a build where nothing was ever armed | **3** |
+| 13 | The "macOS changed" notice is not cleared after firing | telling the user the same thing on every arm until they mute it | **1** |
+| 14 | A first run counts as an OS change | announcing an update to someone for whom Lidwing has never worked once | **3** |
+| 15 | Only the marketing version is compared, the build ignored | missing a security update that ships a new kernel and keeps the version | **1** |
+| 16 | One sound per chime, no fallbacks | the original defect: a missing system sound silences a chime with no warning | **3** |
+| 17 | A chime with nothing available is dropped instead of reported | antipattern 37 exactly: the option remains, the sound does not | **2** |
+| 18 | The sound self-check reports success too, on every launch | noise that trains the user to ignore the one real warning | **1** |
+| 19 | The failure sound reuses a confirmation sound | a failure that sounds exactly like success | **2** |
 
-Each was applied, measured, and reverted; the suite returned to **168 passed, 0 failed** after
-every one.
+Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
+(168 tests when mutations 1-7 were run, 203 for 8-19).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist
 because the mock was corrected to model a guard the real machine has and the mock did not.
 
-**Mutation 4 is the thin one, and it is worth saying so.** Exactly one test
+**Mutations 4, 8, 9, 10, 13 and 15 are each caught by exactly one test.** They are listed
+individually rather than averaged into a comfortable number, because a single test is a single
+careless edit away from being the only thing that noticed.
+
+**Mutation 4 is the thinnest, and it is worth saying so.** Exactly one test
 (`testWeNeverClearTheBitInAConfigurationPowerdOwns`) stands between that change and shipping,
 which means a careless edit to that single test would remove the only guard on an invariant
 whose failure mode is *sleeping somebody else's lid-closed Mac in the middle of their work*.
@@ -133,10 +149,11 @@ user's agent, and actually gets the data.
 
 | Gate | Command | Result | Positive control |
 |---|---|---|---|
-| Core purity | `./Scripts/check-core-purity.sh` | pass, 11 files scanned | Inserting `import AppKit` into `Sources/LidwingCore/Version.swift` produced `FAIL: LidwingCore imports a platform-specific framework` and exit 1; removing it returned exit 0. Transcript below. |
+| Core purity | `./Scripts/check-core-purity.sh` | pass, 22 files scanned | Inserting `import AppKit` into `Sources/LidwingCore/Version.swift` produced `FAIL: LidwingCore imports a platform-specific framework` and exit 1; removing it returned exit 0. Transcript below. |
 | Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
-| Lint | `swiftlint lint --strict` | **0 violations in 72 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
+| Lint | `swiftlint lint --strict` | **0 violations in 132 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
 | Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
+| Bundle contract | `./Scripts/check-bundle-contract.sh` | pass | Five controls, each proven red: the watchdog renamed in the build, the helper dropped from signing, a bundle id drifting in a workflow, the constant made unextractable, the agent plist missing from the build. Two of the five failed first time because of defects **in the check** - see `AUDIT.md` round 8. |
 | Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |
 
 ```
