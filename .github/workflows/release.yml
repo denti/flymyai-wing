@@ -10,7 +10,10 @@ on:
         required: true
 
 permissions:
-  contents: read
+  # `gh release create` writes. With `read` the whole job fails at the last step, after a
+  # twenty-minute build - which is exactly the sort of thing that is discovered at the worst
+  # possible moment.
+  contents: write
 
 env:
   APP_NAME: Lidwing
@@ -129,29 +132,79 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          SIGNED: ${{ steps.cert.outputs.have_cert }}
         run: |
           set -euo pipefail
+
           {
-            echo "## Verify this download"
+            if [ "${SIGNED:-false}" = "true" ]; then
+              echo "Signed with a Developer ID and notarized by Apple."
+              echo
+              echo "1. Open the \`.dmg\`, drag **Lidwing** onto **Applications**."
+              echo "2. Double-click it. A wing appears in your menu bar."
+              echo
+              echo "Then check that Apple signed it, that it declares no permissions, and that"
+              echo "it cannot open a network connection:"
+              echo
+              echo '```'
+              echo 'spctl -a -vvv -t exec /Applications/Lidwing.app'
+              echo 'plutil -p /Applications/Lidwing.app/Contents/Info.plist | grep -i UsageDescription'
+              echo 'codesign -d --entitlements - /Applications/Lidwing.app'
+              echo '```'
+              echo
+              echo "The last two return nothing. That is the point."
+            else
+              echo "### This build is ad-hoc signed, so macOS will refuse it once"
+              echo
+              echo "The Apple Developer Program enrolment has not completed, so this is not"
+              echo "notarized. It runs, but Gatekeeper does not recognise it, and **macOS 15"
+              echo "removed the Control-click to Open shortcut entirely**. The path that works:"
+              echo
+              echo "1. Open the \`.dmg\` and drag **Lidwing** onto **Applications**."
+              echo "   Drag it in Finder, not with \`mv\` - Finder clears the quarantine flag."
+              echo "2. Double-click **Lidwing**. macOS refuses. Click **Done**."
+              echo "3. **Within the next hour**, open **System Settings > Privacy & Security**"
+              echo "   and scroll to the **Security** section at the bottom."
+              echo "4. Next to \"Lidwing was blocked\", click **Open Anyway**, confirm, and"
+              echo "   enter your Mac password."
+              echo "5. The wing appears in your menu bar. You do this once."
+              echo
+              echo "\`spctl -a -vvv -t exec\` **will fail** on this build and that is expected."
+              echo "These two still hold, and are worth checking:"
+              echo
+              echo '```'
+              echo 'plutil -p /Applications/Lidwing.app/Contents/Info.plist | grep -i UsageDescription'
+              echo 'codesign -d --entitlements - /Applications/Lidwing.app'
+              echo '```'
+              echo
+              echo "Both return nothing: no permissions are requested and no entitlements are"
+              echo "declared at all."
+            fi
+
+            echo
+            echo "### Verify this download"
             echo
             echo '```'
             cat dist/SHA256SUMS.txt
             echo '```'
-            echo
-            echo "Then check that Apple signed it, that it declares no permissions, and that it"
-            echo "cannot open a network connection:"
-            echo
-            echo '```'
-            echo 'spctl -a -vvv -t exec /Applications/Lidwing.app'
-            echo 'plutil -p /Applications/Lidwing.app/Contents/Info.plist | grep -i UsageDescription'
-            echo 'codesign -d --entitlements - /Applications/Lidwing.app'
-            echo '```'
-            echo
-            echo "The last two return nothing. That is the point."
           } > release-notes.md
 
+          # Hand-written notes for this tag, if there are any, go first.
+          if [ -f "docs/release-notes/$TAG.md" ]; then
+            cat "docs/release-notes/$TAG.md" release-notes.md > combined.md
+            mv combined.md release-notes.md
+          fi
+
+          # Anything below 1.0 is a pre-release, and GitHub should say so on the page rather
+          # than leaving the reader to infer it from the number.
+          PRERELEASE=""
+          case "$TAG" in
+            v0.*) PRERELEASE="--prerelease" ;;
+          esac
+
+          # shellcheck disable=SC2086  # PRERELEASE is a deliberate optional flag
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --title "$TAG" --notes-file release-notes.md \
+            --title "$TAG" --notes-file release-notes.md $PRERELEASE \
             $(find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' -o -name 'SHA256SUMS.txt' \))
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4

@@ -1,5 +1,10 @@
 # Installing Lidwing
 
+**Right now, every build is the unsigned one.** The Apple Developer Program enrolment has not
+completed, so start at [The unsigned build](#the-unsigned-build-development-only) below — six
+steps, once. The signed path is written down because it is what shipping looks like, not
+because it is what you will get today.
+
 Two paths. Which one you get depends on whether the build you downloaded was signed by Apple's
 Developer Program, and the difference is six steps.
 
