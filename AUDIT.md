@@ -580,6 +580,30 @@ to be a deliberate decision somebody defends.
 
 ---
 
+## Round 13 — 2026-08-10, the core function, on the owner's terms
+
+Scope: the four things he named as what makes this a product - the 8-hour soak, the charger
+plug/unplug case, the dark-wake hole, and the many-MacBooks matrix. Three of the four have work
+that does not need his hardware.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 13.1 | **The soak-cleanliness assertion could not fail on the two numbers it names.** `isCleanSoak` read `(sleepCountDelta ?? 0) == 0 && (darkWakeCountDelta ?? 0) == 0`, and `finishSession` passed `nil` for both at its only call site. So every audit record without an explicitly recorded failure reported itself as a clean soak, whatever the machine had done. This is the "empty reads as success" pattern, inside the check written to catch it. | **High** | Three verdicts instead of two: `clean`, `dirty`, and `unmeasured`. A run nobody measured is not a run that went well. |
+| 13.2 | **Nothing recorded the sleeps it had already observed.** Every sleep while armed arrives as an IOKit notification and is recorded as a failure, and the session knew the count - it just never reached the audit record. | Medium | `sleepCountDelta` now carries the session's own observed count, which is stricter than a `pmset` delta for this purpose: it counts sleeps *while armed*, which is the only kind that matters. |
+| 13.3 | **The recoverable powerd stomp - the common case - was untested.** Only its failure was: the case where the bit cannot be recovered. What a user experiences every time they plug in a charger had no test at all. | Medium | Seven tests: recovery by the charger event, by a display event, by the reconcile tick, five plug/unplug cycles staying armed and silent, the reassert count reaching the audit record, and the boundary where a stomp that cannot be recovered still fails loudly. |
+
+`darkWakeCountDelta` is deliberately still `nil`, and now that means something: the record reports
+`unmeasured` rather than claiming a zero nobody took. Distinguishing a dark wake from a full wake
+needs capability flags this app does not read yet. Recording a zero we did not measure is exactly
+how the previous version of that line lied.
+
+**Round 13 verdict:** three defects, one of them in the assertion that decides whether an
+eight-hour run passed. The soak was going to be run against a check that could not fail.
+
+---
+
 ## Round 12 — 2026-08-10, a real machine's power assertions
 
 Scope: what Lidwing would actually do on the owner's Mac, given its real `pmset -g assertions`

@@ -351,6 +351,124 @@ final class StateMachineTests: XCTestCase {
         XCTAssertTrue(effects.contains(.notify(.groundTruthLost)))
     }
 
+    // MARK: the powerd stomp
+    //
+    // The known hole in this mechanism, and the one the 8-hour soak exists to measure: powerd
+    // re-evaluates clamshell behaviour on charger and display events and can clear the bit we
+    // set. The recovery path was written for it, and until now only its *failure* was tested -
+    // the case where the bit cannot be recovered. The ordinary case, where it is recovered
+    // within milliseconds, is what a user actually experiences every time they plug in.
+
+    /// The charger goes in, powerd clears the bit, and the event itself brings it back - without
+    /// waiting for any timer.
+    func testAChargerEventRecoversTheBitImmediately() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .armed)
+
+        // powerd stomps it: the machine reports it would sleep on lid close again.
+        system.clamshellCausesSleep = true
+        let writesBefore = system.clamshellWrites.count
+
+        machine.handle(.powerSourceChanged)
+
+        XCTAssertEqual(system.clamshellWrites.count, writesBefore + 1,
+                       "the charger event did not re-issue the write")
+        XCTAssertEqual(system.clamshellCausesSleep, false, "the bit was not recovered")
+        XCTAssertEqual(machine.state, .armed)
+    }
+
+    /// A display being attached or removed is the other trigger powerd reacts to.
+    func testADisplayEventAlsoRecoversTheBit() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        system.clamshellCausesSleep = true
+        machine.handle(.displayReconfigured)
+
+        XCTAssertEqual(system.clamshellCausesSleep, false)
+        XCTAssertEqual(machine.state, .armed)
+    }
+
+    /// If the event is missed, the five-second reconcile catches it. Two independent paths to
+    /// the same recovery, which is the point: the notification is best-effort and the timer is not.
+    func testTheReconcileTickRecoversAStompThatMissedItsEvent() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        system.clamshellCausesSleep = true
+        machine.handle(.reconcileTick)
+
+        XCTAssertEqual(system.clamshellCausesSleep, false, "the reconcile did not restore it")
+        XCTAssertEqual(machine.state, .armed, "a recovered stomp is not a failure")
+    }
+
+    /// **The rule from decision 0014, applied to the most frequent event in the product.**
+    /// Plugging in a charger recovers in milliseconds and there is nothing for the user to do,
+    /// so it must produce no notification, no chime and no failure state. Five plug/unplug
+    /// cycles is what the soak asks the owner to perform.
+    func testFivePlugCyclesRecoverSilentlyAndStayArmed() {
+        let (system, _, audit, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        var effects: [LidwingEffect] = []
+        for _ in 0..<5 {
+            system.onAC = true
+            system.clamshellCausesSleep = true          // powerd stomps on the transition
+            effects += machine.handle(.powerSourceChanged)
+            system.onAC = false
+            system.clamshellCausesSleep = true
+            effects += machine.handle(.powerSourceChanged)
+        }
+
+        XCTAssertEqual(machine.state, .armed, "five charger events ended the session")
+        XCTAssertEqual(system.clamshellCausesSleep, false)
+        XCTAssertFalse(effects.contains { if case .notify = $0 { return true } else { return false } },
+                       "a recovered stomp interrupted the user: \(effects)")
+        XCTAssertFalse(effects.contains { if case .chime = $0 { return true } else { return false } },
+                       "a recovered stomp made a sound")
+        XCTAssertFalse(audit.contains(.groundTruthLost),
+                       "a recovery that worked was recorded as a loss")
+    }
+
+    /// Every recovery is counted, because the number is the evidence about how often powerd
+    /// actually does this - and that number is the whole reason the soak is worth eight hours.
+    func testEveryRecoveryIsCountedInTheSessionRecord() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+        let before = machine.session?.reasserts ?? 0
+
+        for _ in 0..<3 {
+            system.clamshellCausesSleep = true
+            machine.handle(.powerSourceChanged)
+        }
+
+        XCTAssertEqual((machine.session?.reasserts ?? 0) - before, 3,
+                       "the audit record cannot show how often the bit was stomped")
+    }
+
+    /// A stomp that is *not* recovered is still a failure, loudly. This is the boundary either
+    /// side of which the product means something different.
+    func testAStompThatCannotBeRecoveredStillFails() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        system.mechanismWorks = false
+        system.clamshellCausesSleep = true
+        machine.handle(.reconcileTick)
+        system.advance(StateMachine.verifyDeadline + 0.1)
+        let effects = machine.handle(.reconcileTick)
+
+        XCTAssertEqual(machine.state, .failed)
+        XCTAssertTrue(effects.contains(.notify(.groundTruthLost)))
+    }
+
     // MARK: watchdog
 
     func testLosingTheWatchdogForcesDisarm() {

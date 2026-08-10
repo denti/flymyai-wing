@@ -122,11 +122,34 @@ public struct AuditRecord: Equatable, Codable, Sendable {
 
     /// The assertion the project's own soak loop runs after every long run. A record that
     /// fails this is a product failure, not a warning.
+    ///
+    /// **An unmeasured counter is not a zero.** This read `(sleepCountDelta ?? 0) == 0`, and
+    /// both counters were passed as `nil` at every call site - so the assertion that decides
+    /// whether an eight-hour run was clean could not fail on either of the two numbers it names.
+    /// Empty read as success, in the check written to catch exactly that.
+    ///
+    /// Now a record whose counters were never measured is not clean; it is unknown, and
+    /// `cleanliness` says which.
     public var isCleanSoak: Bool {
-        (sleepCountDelta ?? 0) == 0
-            && (darkWakeCountDelta ?? 0) == 0
-            && groundTruthFailures == 0
-            && failures.isEmpty
+        cleanliness == .clean
+    }
+
+    public enum Cleanliness: String, Equatable, Sendable {
+        case clean
+        /// Something went wrong: a sleep, a dark wake, a ground-truth failure.
+        case dirty
+        /// The run cannot be judged, because a number it depends on was never measured. Not a
+        /// pass and not a failure - a gap, which is worth saying out loud rather than rounding
+        /// to whichever is convenient.
+        case unmeasured
+    }
+
+    public var cleanliness: Cleanliness {
+        if !failures.isEmpty || groundTruthFailures > 0 { return .dirty }
+        if let sleeps = sleepCountDelta, sleeps > 0 { return .dirty }
+        if let darkWakes = darkWakeCountDelta, darkWakes > 0 { return .dirty }
+        guard sleepCountDelta != nil, darkWakeCountDelta != nil else { return .unmeasured }
+        return .clean
     }
 }
 

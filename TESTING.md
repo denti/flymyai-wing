@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **276** |
+| Tests | **291** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -92,9 +92,16 @@ its own bookkeeping:
 | 42 | Refusing to arm because another app holds an assertion | the shipped bug from decision 0013: on a developer Mac running an agent, Lidwing never arms at all | **6** |
 | 43 | The other holder hidden behind a battery or thermal line | conflict demoted to a fallback, so the user sees it only when nothing else is wrong | **7** |
 | 44 | A self-releasing holder described as a standing one | sending the user hunting for a `caffeinate` that stops existing while they look | **1** |
+| 45 | The charger event no longer triggers a re-assert | the powerd stomp survives until the next timer tick, on the most frequent event in the product | **7** |
+| 46 | The re-assert stops re-issuing the write | the stomp is never recovered at all | **7** |
+| 47 | The reconcile stops recovering a stomp | the second, independent recovery path removed, leaving only the best-effort notification | **1** |
+| 48 | A recovered stomp notifies the user | an interruption every time a charger is plugged in, for something already fixed | **1** |
+| 49 | An unmeasured counter reads as zero | the shipped defect: `isCleanSoak` could not fail on either of the two numbers it names | **5** |
+| 50 | A finished session stops recording the sleeps it observed | every audit record leaves the soak unjudgeable | **2** |
+| 51 | A recorded sleep no longer makes a record dirty | the one failure this product exists to prevent, not counted against it | **3** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

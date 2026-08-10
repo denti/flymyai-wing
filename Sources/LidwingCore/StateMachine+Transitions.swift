@@ -432,7 +432,17 @@ extension StateMachine {
         let record = session.finish(at: facade.now,
                                     reason: reason,
                                     tier: 1,
-                                    sleepCountDelta: nil,
+                                    // Our own observation, not a parsed `pmset` counter: every
+                                    // sleep while armed arrives as an IOKit power notification
+                                    // and is recorded, and sleeps *while armed* are exactly what
+                                    // this field is for. It was `nil` at every call site, which
+                                    // combined with `isCleanSoak` treating nil as zero meant no
+                                    // audit record could ever report an unclean run.
+                                    sleepCountDelta: session.sleepFailureCount,
+                                    // Still not measured. Distinguishing a dark wake from a full
+                                    // wake needs capability flags this app does not yet read, and
+                                    // recording a zero we did not measure is how the previous
+                                    // version of this line lied.
                                     darkWakeCountDelta: nil,
                                     os: identity.osVersion,
                                     arch: identity.arch,
