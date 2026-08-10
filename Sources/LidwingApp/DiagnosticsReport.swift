@@ -73,15 +73,13 @@ enum DiagnosticsReport {
         lines.append("  Thermal                    \(system.thermalState)")
         lines.append("")
 
-        let holders = system.foreignAssertionHolders
-        lines.append("Other processes holding this Mac awake")
-        if holders.isEmpty {
-            lines.append("  none")
-        } else {
-            for holder in holders {
-                lines.append("  \(holder.name) (pid \(holder.pid))")
-            }
-        }
+        // The full inventory, classified, rather than the slice the app acts on.
+        //
+        // A user asked why Lidwing said "another app is keeping this Mac awake: powerd", and the
+        // honest answer needed the whole list and what each entry means. Printing only what the
+        // app reacts to would have hidden exactly the line that explained the mistake.
+        lines.append("Power assertions held on this Mac")
+        lines.append(contentsOf: DiagnosticsAssertions.report())
         lines.append("")
 
         lines.append("Recent sessions")

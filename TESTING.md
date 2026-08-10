@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **291** |
+| Tests | **295** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -99,13 +99,21 @@ its own bookkeeping:
 | 49 | An unmeasured counter reads as zero | the shipped defect: `isCleanSoak` could not fail on either of the two numbers it names | **5** |
 | 50 | A finished session stops recording the sleeps it observed | every audit record leaves the soak unjudgeable | **2** |
 | 51 | A recorded sleep no longer makes a record dirty | the one failure this product exists to prevent, not counted against it | **3** |
+| 52 | The diagnostics inventory drops what the app ignores | hiding the very lines that explain why the app said nothing | **4** |
+| 53 | An empty machine prints nothing instead of saying so | "nothing was held" and "the read failed" become the same output | **1** |
+| 54 | The irrelevant assertions stop being counted | a silent drop, so a reader cannot tell whether the classification lost something | **2** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist
 because the mock was corrected to model a guard the real machine has and the mock did not.
+
+Mutation 53 first went red by **trapping** rather than failing: the test indexed `lines[0]`, so an
+empty result crashed the suite and took every other result with it. A crash is a signal, but it is
+the wrong one - it turns a single clear failure into a run that reports nothing. The assertions
+use `XCTUnwrap` now.
 
 Mutations 36 and 37 were **green on the first attempt**, and that is the finding rather than a
 footnote: the owner filter and the kind filter are redundant *for the real fixture*, because every

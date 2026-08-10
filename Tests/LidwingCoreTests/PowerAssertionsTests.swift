@@ -178,6 +178,54 @@ final class ConflictPolicyTests: XCTestCase {
         XCTAssertTrue(coexisting.contains("caffeinate"))
     }
 
+    // MARK: the diagnostics inventory
+
+    /// A support bundle is read by somebody who cannot see the machine, so it carries everything
+    /// - including what the app deliberately ignores, which is the part that explains why the
+    /// app said nothing.
+    func testTheInventoryCarriesEverythingWithItsClassification() throws {
+        let lines = ConflictPolicy.diagnosticsLines(from: try quietMac())
+        let whole = lines.joined(separator: "\n")
+
+        // `XCTUnwrap` rather than `lines[0]`: an empty result would otherwise trap and take the
+        // whole suite with it, which turns one clear failure into a run that reports nothing.
+        let summary = try XCTUnwrap(lines.first)
+        XCTAssertTrue(summary.contains("7 held"), summary)
+        XCTAssertTrue(summary.contains("0 worth mentioning"), summary)
+        // The ones we coexist with are named, so a reader can see they were considered.
+        XCTAssertTrue(whole.contains("Claude"), whole)
+        XCTAssertTrue(whole.contains("caffeinate"), whole)
+        XCTAssertTrue(whole.contains("coexists with this"), whole)
+    }
+
+    /// The counts have to add up, or a reader cannot tell whether something was dropped
+    /// silently - which is the whole reason the irrelevant ones are counted rather than omitted.
+    func testTheCountsAccountForEveryAssertion() throws {
+        for fixture in [try quietMac(), try developerMac()] {
+            let first = try XCTUnwrap(ConflictPolicy.diagnosticsLines(from: fixture).first)
+            let numbers = first.split(whereSeparator: { !$0.isNumber }).compactMap { Int($0) }
+            XCTAssertEqual(numbers.count, 4, first)
+            XCTAssertEqual(numbers[0], numbers[1] + numbers[2] + numbers[3],
+                           "the classification lost or duplicated an assertion: \(first)")
+        }
+    }
+
+    /// "Nothing was held" and "the read failed" are the same empty list and completely different
+    /// facts. The report must not let them look alike.
+    func testAnEmptyMachineSaysSoRatherThanPrintingNothing() throws {
+        let lines = ConflictPolicy.diagnosticsLines(from: [])
+        let only = try XCTUnwrap(lines.first, "an empty machine printed nothing at all")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(only.contains("none held"), only)
+    }
+
+    /// A self-releasing holder is marked in the inventory too - a reader looking at a support
+    /// bundle an hour later should not go hunting for a `caffeinate` that has since exited.
+    func testTheInventoryMarksSelfReleasingHolders() throws {
+        let whole = ConflictPolicy.diagnosticsLines(from: try developerMac()).joined()
+        XCTAssertTrue(whole.contains("self-releasing"), whole)
+    }
+
     func testNothingHeldMeansNothingSaid() {
         XCTAssertTrue(ConflictPolicy.noteworthy(from: []).isEmpty)
         XCTAssertNil(ConflictPolicy.headline(from: []))

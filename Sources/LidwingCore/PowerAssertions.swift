@@ -254,4 +254,32 @@ public enum ConflictPolicy {
     public static func headline(from conflicts: [Conflict]) -> Conflict? {
         conflicts.first { !$0.isTransient }
     }
+
+    /// The whole inventory as the diagnostics report prints it.
+    ///
+    /// Everything, classified - not the slice the app reacts to. A user asked why Lidwing had
+    /// named `powerd`, and answering that needed the full list plus what each entry meant;
+    /// printing only what the app acts on would have hidden the line that explained the mistake.
+    ///
+    /// The counts come first so a reader can tell "nothing was held" from "the read failed",
+    /// which are the same empty list and very different facts.
+    public static func diagnosticsLines(from assertions: [PowerAssertions.Assertion]) -> [String] {
+        guard !assertions.isEmpty else { return ["  none held by any process"] }
+
+        let noteworthy = noteworthy(from: assertions)
+        let coexisting = coexisting(from: assertions)
+        var lines = ["  \(assertions.count) held; \(noteworthy.count) worth mentioning, "
+                     + "\(coexisting.count) coexisting, "
+                     + "\(assertions.count - noteworthy.count - coexisting.count) irrelevant here"]
+        for conflict in noteworthy {
+            lines.append("  ! \(conflict.displayName) (pid \(conflict.pid)) "
+                         + "\(conflict.kind.rawValue) - stops sleep outright")
+        }
+        for conflict in coexisting {
+            let note = conflict.isTransient ? ", self-releasing" : ""
+            lines.append("    \(conflict.displayName) (pid \(conflict.pid)) "
+                         + "\(conflict.kind.rawValue)\(note) - Lidwing coexists with this")
+        }
+        return lines
+    }
 }

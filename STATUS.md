@@ -13,7 +13,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   claim that used to sit here was false, and it was false in the way that matters: it was
   checkable, and nothing checked it. Both failures were the test's own socket path exceeding
   `sun_path` on a CI runner, not a product defect - but that is luck, not diligence.
-- **291 unit tests, 0 failures**, 1.6 s on Linux; the same suite plus 33 macOS-only tests in CI.
+- **295 unit tests, 0 failures**, 1.7 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -26,7 +26,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, fifty-one ways**, and every gate in the
+- **The suite has been proven able to fail, fifty-four ways**, and every gate in the
   repository has now been watched failing at least once except one, which is named as unproven
   in `TESTING.md` rather than listed beside the others. Deliberate mutations produced
   21, 14, 13, 9, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1
@@ -135,6 +135,7 @@ Nothing is idling on any of these.
 | The M0 verdict | The arithmetic that decides the architecture is extracted from the shipped script and run against sixteen cases, including the one that mattered: a run in which the lid was never closed |
 | Zero-step flow | Decision 0012: Lidwing arms itself at launch, so install-to-value is nothing at all. Possible only because Tier 1 needs no privileges. Every existing refusal still applies, and **no refusal on the launch path may open a dialog** - which is the v0.1.0 crash class, enforced by a type rather than by care |
 | Conflict detection | Three tiers, and only one is a conflict: the clamshell bit set by somebody else. A `DenySystemSleep` holder earns one quiet line; every idle-sleep holder is ignored, Apple's or anybody's. The *kind* of hold decides, never the owner - filtering by owner is what named `powerd` to a user on every launch. Parsed and classified against the real output of a working developer Mac, kept as a fixture: three assertion types, three owners, three lifetimes, plus the system noise around them. It distinguishes idle-sleep from system-sleep, drops what macOS asserts on its own behalf, names the owner the way a person would recognise it, and refuses to let a self-respawning `caffeinate -t 300` become a menu-bar state that flaps every few minutes |
+| Diagnostics that answer | The support bundle carries the **whole** power-assertion inventory, classified: what earns a line, what Lidwing coexists with, and how many were irrelevant. Printing only what the app reacts to would have hidden the very lines that explained the `powerd` mistake. It is the one sanctioned shell-out, bounded at two seconds, and the file is named `Diagnostics…` so the lint rule that forbids it everywhere else keeps working |
 | Nothing empty | Every notification, alert and badge has to answer "what does the user do differently because of it?" Three failed and were deleted rather than softened: a first-arm greeting, a note that macOS changed and this still worked, and a popover pointing at the menu bar. The chime on lid close is exempt - it is the one signal that reaches somebody who cannot see the screen |
 | Conflict is visible | Another app holding the Mac awake now has its own glyph - outline wing plus attention dot - beside the menu line naming it. The grammar is two independent cues: fill means Lidwing is protecting, a dot means something wants attention |
 | Honest hardware | `HardwareSupport` carries what has actually been **run**, never what should work. Exactly one machine is listed, at the weaker of two levels, citing the run. Anything else is `untested`, and the menu says so in a line that does not read as a prediction of failure |
