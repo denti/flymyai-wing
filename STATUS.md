@@ -3,7 +3,7 @@
 Updated every cycle. PROVEN means a machine checked it and the output is in this repository.
 ASSUMED means it follows from reading, not from running. BROKEN means it is red right now.
 
-**Cycle 4** · 2026-08-10
+**Cycle 5** · 2026-08-10
 
 ## PROVEN
 
@@ -11,7 +11,10 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   `lint` (`swiftlint --strict`, 0 violations), and the `macos-26` canary. The whole Darwin
   layer — IOKit, CoreAudio, AppKit, the watchdog daemon, the C notify helper — compiles and
   its tests pass on both macOS 15 and macOS 26.
-- **162 unit tests, 0 failures**, 0.9 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **165 unit tests, 0 failures**, 1.0 s on Linux; the same suite plus 20 macOS-only tests in CI.
+- **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
+  binary, 12 528 bytes, no warnings at `-Wall -Wextra -Werror`, and **4 ms with no listener**
+  against a 150 ms budget. Running it found a real defect — see below.
 - **A `.dmg` exists.** `Scripts/build.sh` → `sign.sh` → `package.sh` → `invariants.sh` runs
   end to end on every push. All **14 artifact invariants** are green on the real artifact:
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
@@ -70,6 +73,7 @@ Nothing is idling on any of these.
 | Logging | A closed catalogue of 24 events, none below `.notice`, with the field allowlist unit-tested. `docs/SYMBOLICATE.md` turns any crash report a user pastes into a line number |
 | Localisation | Every user-visible string through one catalogue, with a full Russian translation. Two tests: every catalogue covers every key, and every translation keeps its placeholders |
 | Security | `SECURITY.md`: three surfaces, four mechanisms against the one failure mode that matters |
+| Hook helper | `Scripts/test-notify-helper.sh` — compiles it, runs it, measures it. Part of the ordinary gate on Linux and on macOS |
 
 ## Decisions recorded
 
@@ -89,11 +93,12 @@ Nothing is idling on any of these.
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 5 (running, not reading) | Compile and execute the hook helper | It read stdin non-blockingly, so a payload the caller wrote a moment later was **silently lost** and every Claude Code notification would have arrived with an empty body. The test that proves it needed the race made deterministic first. |
 | 1 | Read for correctness | **Critical.** `wingprobe disarm` — the safety valve — called `arm()` on its way through and would have armed the machine it was asked to release. |
 | 2 | Read as a running process | A modal dialog spins its own run loop, so the reconcile timer fired underneath one and could stack a second dialog on top. And a verify tick that returned early without stopping its own 10 Hz timer. |
 | 3 | Fresh eyes, trace every write | **High.** The Repair button could not clear a bit left behind by a previous process, and reported success. It survived two audits and 135 passing tests because `MockSystem` wrote unconditionally — a mock more permissive than the machine does not test, it reassures. |
 
-Eleven rejected findings are recorded with their reasons.
+Fourteen rejected findings are recorded with their reasons.
 
 ## NEXT
 
