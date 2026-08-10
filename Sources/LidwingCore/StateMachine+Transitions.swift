@@ -38,7 +38,10 @@ extension StateMachine {
     /// set, and it exists because doing it silently is worse.
     func onRepairRequested() -> [LidwingEffect] {
         guard state == .repair else { return [] }
-        _ = facade.setClamshellSleepDisabled(false)
+        // `repairClamshellState`, not `setClamshellSleepDisabled(false)`: the latter refuses to
+        // clear a bit this process did not set, which is exactly the situation Repair exists
+        // for. Using it here would make the button report success and change nothing.
+        _ = facade.repairClamshellState()
         _ = facade.setIdleAssertion(false)
         weSetTheBit = false
         idleAssertionHeld = false

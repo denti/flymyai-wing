@@ -33,15 +33,47 @@ final class MockSystem: SystemFacade {
     /// Injected failure for the assertion write.
     var assertionWriteResult: Result<Void, MechanismError> = .success(())
 
+    /// Modelled because the real `ClamshellLock` refuses to clear a bit it did not set. A mock
+    /// that writes unconditionally is more permissive than the machine, and it hid a bug where
+    /// the Repair button reported success and did nothing.
+    private(set) var lockOwnsTheBit = false
+    private(set) var repairCalls = 0
     private(set) var clamshellWrites: [Bool] = []
     private(set) var assertionWrites: [Bool] = []
     private(set) var sleepRequests = 0
 
     func setClamshellSleepDisabled(_ on: Bool) -> Result<Void, MechanismError> {
+        if !on && !lockOwnsTheBit {
+            // Invariant I7 in the live implementation: never clear a bit we did not set. The
+            // call is a no-op rather than an error, exactly as `ClamshellLock.safeRelease` is.
+            clamshellWrites.append(on)
+            return .success(())
+        }
         clamshellWrites.append(on)
         if case .failure = clamshellWriteResult { return clamshellWriteResult }
-        if mechanismWorks { clamshellCausesSleep = !on }
+        if mechanismWorks {
+            clamshellCausesSleep = !on
+            lockOwnsTheBit = on
+        }
         return .success(())
+    }
+
+    func repairClamshellState() -> Result<Void, MechanismError> {
+        repairCalls += 1
+        clamshellWrites.append(false)
+        if case .failure = clamshellWriteResult { return clamshellWriteResult }
+        if mechanismWorks {
+            clamshellCausesSleep = true
+            lockOwnsTheBit = false
+        }
+        return .success(())
+    }
+
+    /// Puts the mock in the state a *previous* process left behind: the bit is set and this
+    /// process does not own it.
+    func simulateBitSetByAnotherProcess() {
+        clamshellCausesSleep = false
+        lockOwnsTheBit = false
     }
 
     func setIdleAssertion(_ on: Bool) -> Result<Void, MechanismError> {

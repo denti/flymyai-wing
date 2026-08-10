@@ -108,3 +108,73 @@ this section says **unmeasured** rather than quoting the budgets as if they were
 **Round 2 verdict:** no correctness defects, eight efficiency and robustness ones, and the two
 that matter most (the never-stopping fast timer, the stacking modals) were reachable only by
 reading the code as a running process rather than as a set of functions.
+
+
+---
+
+## Round 3 — 2026-08-10, fresh eyes, and one bug the tests were built to miss
+
+Method: read the tree as if I had never seen it, then trace every path that can write to the
+machine and every path that can read from it. No prior knowledge of what any file was for.
+
+### The finding that matters
+
+**The Repair button could not work, and the test suite said it did.**
+
+Repair exists for exactly one situation: a *previous* Lidwing process left the clamshell bit
+set — it crashed, or the Mac was force-restarted — and the running process finds a non-stock
+machine at launch. It offers to put it back.
+
+The implementation called `setClamshellSleepDisabled(false)`, which routes through
+`ClamshellLock.safeRelease`, which begins:
+
+```swift
+guard weSetTheBit else { return KERN_SUCCESS }
+```
+
+That guard is invariant I7 and it is **correct** — every automatic path must refuse to clear a
+bit this process did not set. But Repair is the one path whose entire purpose is to clear a bit
+this process did not set. So the button would have reported success, written nothing, and left
+the user with a Mac that still would not sleep.
+
+**Why every test passed anyway:** `MockSystem` wrote unconditionally. It did not model the
+`weSetTheBit` guard at all, so the mock was strictly more permissive than the machine it stands
+for — and a mock that is more permissive than reality does not test, it reassures.
+
+Fixed three ways:
+
+1. A separate `repairClamshellState()` on the facade, reachable only from a button the user
+   pressed after reading what it does, which skips the ownership guard and keeps the powerd
+   one.
+2. `MockSystem` now models ownership, so the divergence cannot hide again.
+3. `testRepairClearsABitLeftBehindByAPreviousProcess` reproduces the real situation. Positive
+   control: restoring the original call makes **3 tests fail**; the fix returns 142/0.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 3.1 | Repair could not clear a bit left by a previous process, and reported success (above). | **High** | A distinct facade method, a mock that models the guard, and three tests. |
+| 3.2 | Auto mode's `agentAppeared` and `agentDisappeared` events had no producer. A branch no caller can reach is a stub with better manners. | Medium | Wired: a 15 s scan while Auto is selected, plus the control that turns it on. |
+| 3.3 | `MockSystem` did not model the ownership guard (the reason 3.1 survived two audits). | **High** | Modelled, with `simulateBitSetByAnotherProcess()` for the state a crash leaves behind. |
+
+### Findings, rejected
+
+| Finding | Why |
+|---|---|
+| "Repair should run automatically at launch when the ledger says it was us." | No. A silent clear can stomp powerd, or another keep-awake tool, or a deliberate setting. The reconciliation has exactly three outcomes and two of them are *tell the user something and do nothing*. The one-click button is the whole design. |
+| "`fatalError` in `SettingsWindowController.init?(coder:)`" | It is the `@available(*, unavailable)` NSCoder initialiser for a window built entirely in code. Reaching it is impossible; the alternative is an optional that every call site has to unwrap for a case that cannot happen. |
+| "The 10-second agent cache in `LiveSystem` violates the read-ground-truth rule (I9)." | I9 is about *our own state* — never trusting a cached belief about whether we are protecting the machine. Which processes exist is not our state, and the read is a full process-table walk. The cache is shorter than the poll that consumes it. |
+
+### The governing question, re-answered after three rounds
+
+*Can this app leave a Mac that will not sleep, with the user not knowing why?*
+
+Still a hard no, and round 3 strengthened it: before this round the **recovery path a user is
+told to use** did not work. The other three mechanisms (watchdog EOF, launchd `KeepAlive`, the
+kernel zeroing the mask at boot) would still have saved them, but they would have been told to
+press a button that did nothing, which is its own kind of lie.
+
+**Round 3 verdict:** one high-severity defect, and it was hidden by a mock that flattered the
+code. That is the most useful thing this round found — not the bug, but the reason the bug
+survived two previous audits and 135 passing tests.

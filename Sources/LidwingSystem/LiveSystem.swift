@@ -91,6 +91,13 @@ public final class LiveSystem: SystemFacade {
         return .success(())
     }
 
+    public func repairClamshellState() -> Result<Void, MechanismError> {
+        guard lock.open() else { return .failure(.userClientUnavailable) }
+        let result = lock.forceRelease(desktopMode: desktopMode, onAC: onAC)
+        guard result == KERN_SUCCESS else { return .failure(.ioReturn(result)) }
+        return .success(())
+    }
+
     public func setIdleAssertion(_ on: Bool) -> Result<Void, MechanismError> {
         if on {
             let result = lease.acquire()

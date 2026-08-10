@@ -448,15 +448,42 @@ final class StateMachineTests: XCTestCase {
         XCTAssertTrue(system.clamshellWrites.isEmpty)
     }
 
-    func testRepairClearsTheBitOnlyWhenTheUserAsks() {
+    /// The case Repair exists for: a *previous* process left the bit set and this one does not
+    /// own it. `setClamshellSleepDisabled(false)` refuses to clear a bit it did not set — that
+    /// is invariant I7 and it is right — so Repair has to go through the one path that is
+    /// allowed to, or the button reports success and changes nothing.
+    func testRepairClearsABitLeftBehindByAPreviousProcess() {
         let (system, _, _, _, machine) = TestFixture.harness()
-        system.clamshellCausesSleep = false
+        system.simulateBitSetByAnotherProcess()
         machine.handle(.launch)
         XCTAssertEqual(machine.state, .repair)
 
         machine.handle(.repairRequested)
-        XCTAssertEqual(system.clamshellWrites, [false])
+
+        XCTAssertEqual(system.repairCalls, 1, "Repair went through the path that refuses to act")
+        XCTAssertEqual(system.clamshellCausesSleep, true, "the machine was not actually repaired")
         XCTAssertEqual(machine.state, .idle)
+    }
+
+    func testRepairIsOnlyReachableFromTheRepairState() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        XCTAssertEqual(machine.state, .idle)
+        machine.handle(.repairRequested)
+        XCTAssertEqual(system.repairCalls, 0, "Repair ran without the user being in that state")
+    }
+
+    func testRepairThatDoesNotTakeEffectIsLoud() {
+        let (system, _, audit, _, machine) = TestFixture.harness()
+        system.simulateBitSetByAnotherProcess()
+        machine.handle(.launch)
+
+        system.mechanismWorks = false            // the clear is a no-op, as on a broken OS
+        let effects = machine.handle(.repairRequested)
+
+        XCTAssertEqual(machine.state, .failed)
+        XCTAssertTrue(audit.contains(.releaseNoEffect))
+        XCTAssertTrue(effects.contains(.notify(.releaseFailed)))
     }
 
     func testLaunchOnAMachineWithNoLidIsUnsupported() {

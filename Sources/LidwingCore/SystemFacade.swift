@@ -91,6 +91,17 @@ public protocol SystemFacade: AnyObject {
     // MARK: writes — the only mutating surface
 
     func setClamshellSleepDisabled(_ on: Bool) -> Result<Void, MechanismError>
+    /// Clears the clamshell mask **without** requiring that this process set it.
+    ///
+    /// Separate from `setClamshellSleepDisabled(false)` on purpose. That one refuses to clear a
+    /// bit we did not set (invariant I7), which is right for every automatic path — but it
+    /// makes the Repair button, whose entire job is to clean up after a *previous* process,
+    /// silently do nothing. Repair is the one place a user explicitly asks us to touch state we
+    /// do not own, and it is reachable only from a button they pressed after reading what it
+    /// does.
+    ///
+    /// It still refuses in the configuration where powerd legitimately owns the bit.
+    func repairClamshellState() -> Result<Void, MechanismError>
     func setIdleAssertion(_ on: Bool) -> Result<Void, MechanismError>
     func requestSystemSleep()
 }

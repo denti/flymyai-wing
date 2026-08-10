@@ -126,6 +126,16 @@ public final class ClamshellLock {
         return set(false)
     }
 
+    /// Clears the bit whoever set it. The `weSetTheBit` guard is deliberately absent; the
+    /// powerd guard is deliberately not.
+    @discardableResult
+    public func forceRelease(desktopMode: Bool, onAC: Bool) -> kern_return_t {
+        guard !(desktopMode && onAC) else { return KERN_SUCCESS }
+        let result = set(false)
+        weSetTheBit = false
+        return result
+    }
+
     public func close() {
         if connection != 0 {
             IOServiceClose(connection)
