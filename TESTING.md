@@ -157,6 +157,7 @@ user's agent, and actually gets the data.
 | Warnings as errors | `swift build -Xswiftc -warnings-as-errors` | pass | Seen red repeatedly during development; the flag is not decorative. |
 | Lint | `swiftlint lint --strict` | **0 violations in 138 files** | Seen red at 42, then 10, then 2 violations across successive fixes in this session. |
 | Workflow syntax | `actionlint` | pass | Caught red for real: `if: ${{ secrets.X != '' }}` in a step is rejected by GitHub, which produced a run with **zero jobs** and a red tick naming nothing. See §7. |
+| Modals activate first | `./Scripts/check-core-purity.sh` | pass, 12 call sites | Written after finding the un-activated "already running" alert by hand; it then found a **second** one I had missed in the same by-hand pass. Removing either `NSApp.activate` turns it red. |
 | Bundle contract | `./Scripts/check-bundle-contract.sh` | pass | Five controls, each proven red: the watchdog renamed in the build, the helper dropped from signing, a bundle id drifting in a workflow, the constant made unextractable, the agent plist missing from the build. Two of the five failed first time because of defects **in the check** - see `AUDIT.md` round 8. |
 | Artifact invariants | `./Scripts/invariants.sh` | **13 of 13 green** on the first packaged build (CI run 31416964465) | Written before the first artifact existed, deliberately. |
 

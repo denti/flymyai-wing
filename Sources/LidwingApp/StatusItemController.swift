@@ -289,6 +289,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                            + "a restart."))
         report.alertStyle = outcome.succeeded ? .informational : .critical
         report.addButton(withTitle: Strings.text("button.ok", "OK"))
+        // Activate again rather than relying on the activation from the confirmation above.
+        // `Uninstaller.run` sits between the two and takes real time - it disarms, verifies,
+        // rewrites config files and deregisters an agent - and a user who clicks back to their
+        // editor while it works would otherwise get the result behind that editor. This is the
+        // report that says whether their Mac was left in a good state; it does not get to be
+        // the one they miss.
+        NSApp.activate(ignoringOtherApps: true)
         report.runModal()
         if outcome.succeeded { NSApp.terminate(nil) }
     }

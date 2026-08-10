@@ -440,7 +440,27 @@ H8, with the exact keys to press, the two controls to check first, and the live 
 test — six minutes of someone's attention, on the one part of this product that reading cannot
 verify.
 
-**Round 8 verdict:** nine defects, seven of them user-visible, none of them capable of stranding
+### Continued — the rest of the fifty antipatterns
+
+Swept mechanically where a grep could decide it and by reading where it could not. Most entries
+were already satisfied, several of them structurally rather than by luck: every glyph is a
+template image (8, 10, 32), the status item's `autosaveName` is fixed and its behaviour is not
+`.removalAllowed` (11, 12), the menu is real `NSMenuItem`s with no custom views (5, 6, 7), every
+timer carries leeway (33), the assertion is named (35), there are zero usage descriptions and
+zero entitlements (34, 43), and the window is called Settings with a real ellipsis (26).
+
+Two more findings, both the same antipattern, number 18:
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 8.10 | **The "already running" alert was shown without activating.** Lidwing is `LSUIElement`: no Dock icon, no menu bar of its own. That alert opens behind the user's editor, and `runModal` then blocks the process on a dialog they cannot see and cannot dismiss. It is also the worst possible one to lose: its entire audience is a user who double-clicked the app in Finder *because they could not find it*, and what they get is a second invisible process. | Medium | Activate first. |
+| 8.11 | **The uninstall result alert relied on the activation from the confirmation before it**, with `Uninstaller.run` in between - which disarms, verifies, rewrites config files and deregisters an agent, all taking real time. A user who clicks back to their editor while it works gets the report behind that editor. It is the report that says whether their Mac was left in a good state. | Low | Activate again immediately before it. |
+
+8.11 was found by the check written for 8.10, not by me: `check-core-purity.sh` now requires an
+`NSApp.activate` within fifteen lines of every `runModal()` in the app target. My own by-hand
+pass over the same twelve call sites had missed it.
+
+**Round 8 verdict:** eleven defects, nine of them user-visible, none of them capable of stranding
 a Mac. The pattern worth naming: every one of them was invisible to the tests because the tests
 check what the code does, and these were all cases of the code doing something perfectly well
 for a case that never arrives — a cast that never matches, a notification never subscribed, a

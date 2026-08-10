@@ -102,7 +102,7 @@ Nothing is idling on any of these.
 
 | Round | Method | Worst finding |
 |---|---|---|
-| 8 (the spec beside the code) | Read `CRAFT.md` §8 and §11 line by line against the implementation | **Three of the five Settings controls had no help text at all.** The tooltip and the spoken explanation were attached behind `as? NSButton`; a segmented control and two pop-ups are not buttons, and one call site handed the cast a stack view, which could never match. The two silent rows were the battery floor and the duration limit - the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is why it looked fine. |
+| 8 (the spec beside the code) | Read `CRAFT.md` §8 and all fifty antipatterns in §11 against the implementation | **Three of the five Settings controls had no help text at all.** The tooltip and the spoken explanation were attached behind `as? NSButton`; a segmented control and two pop-ups are not buttons, and one call site handed the cast a stack view, which could never match. The two silent rows were the battery floor and the duration limit - the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is why it looked fine. |
 | 7 (CI behaving oddly) | A macOS job stopped making progress | **A test that hung instead of failing.** `sun_path` is 104 bytes on macOS and 108 on Linux; the test's socket path fitted only the larger. The listener's `strncpy` truncated and bound elsewhere, `lidwing-notify` correctly refused the over-long path, and `accept()` waited forever. Everything that waits now has a deadline. |
 | 6 (code vs the specification) | Read the transitions with `DESIGN.md` open beside them | **On a Mac with no lid, nothing ever concluded that.** `lidState` correctly stays `.unknown` while the lid driver has not reported — but nothing turned that into a decision, so on a Mac mini the state stayed `.unknown` forever and the user could turn Lidwing on and read *"Awake — you can close the lid"*. |
 | 5 (running, not reading) | Compile and execute the hook helper | It read stdin non-blockingly, so a payload the caller wrote a moment later was **silently lost** and every Claude Code notification would have arrived with an empty body. The test that proves it needed the race made deterministic first. |
@@ -114,13 +114,9 @@ Twenty-three rejected findings are recorded with their reasons.
 
 ## NEXT
 
-1. Sweep the remaining antipatterns the way round 8 swept §8 and the first forty. Reading the
-   specification beside the code was the most productive round so far, which is worth saying
-   plainly: six earlier rounds read this code for correctness, and none of them read it against
-   the document that defines what "done" means for the visible surface.
-2. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
+1. `Scripts/perf-gate.sh` has never been run. Every number in it is a budget, not a
    measurement, and `AUDIT.md` says so rather than quoting budgets as results.
-3. The real README with the four falsify-us commands and the compatibility table — last, per
+2. The real README with the four falsify-us commands and the compatibility table — last, per
    `DECISIONS.md`, and only listing combinations with a green acceptance run.
-4. Everything blocked on a Mac: M0, fault injection, the perf gate, the smoke script, and the
+3. Everything blocked on a Mac: M0, fault injection, the perf gate, the smoke script, and the
    keyboard and VoiceOver pass (H8).

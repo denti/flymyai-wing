@@ -13,6 +13,13 @@ enum LidwingMain {
         let application = NSApplication.shared
 
         guard SingleInstance.acquire() else {
+            // Activate first. This is the one alert whose whole audience is a user who could
+            // not find the app - they double-clicked it in Finder, which is why a second
+            // instance exists at all - and without this it opens *behind* their editor. An
+            // LSUIElement app has no Dock icon to click, so an unactivated modal is a dialog
+            // they cannot see and cannot dismiss, on a process that is now blocked in
+            // `runModal` until they find it in Mission Control.
+            application.activate(ignoringOtherApps: true)
             let alert = NSAlert()
             Strings.localiser = Translations.localiser(for: Locale.preferredLanguages)
             alert.messageText = Strings.text("dialog.alreadyRunning.title",

@@ -76,6 +76,27 @@ for file in Sources/LidwingApp/*.swift Sources/LidwingSystem/*.swift Sources/lid
   fi
 done
 
+# ---------------------------------------------------------------------------------------
+# 5. Every modal must be preceded by NSApp.activate.
+#
+# Lidwing is LSUIElement: no Dock icon, no menu bar of its own. An NSAlert shown without
+# activating first opens *behind* whatever the user was doing, and `runModal` then blocks the
+# process on a dialog they cannot see and cannot dismiss. This found a real one - the "already
+# running" alert, whose entire audience is a user who double-clicked the app in Finder because
+# they could not find it.
+#
+# Fifteen lines of context, which is the distance in the code that actually exists; a modal
+# whose activate is further away than that is worth a second look anyway.
+while IFS=: read -r file line _; do
+  [ -n "$file" ] || continue
+  start=$((line - 15)); [ "$start" -lt 1 ] && start=1
+  if ! sed -n "${start},${line}p" "$file" | grep -q "activate(ignoringOtherApps"; then
+    echo "FAIL: $file:$line runs a modal without activating first."
+    echo "      An LSUIElement app shows it behind the user's editor, with no Dock icon to click."
+    FAIL=1
+  fi
+done < <(grep -rn "runModal()" Sources/LidwingApp/*.swift 2>/dev/null)
+
 if [ "$FAIL" -eq 0 ]; then
   # Assert on real output, never on the absence of an error: prove we actually looked at files.
   COUNT=$(find "$CORE" -name '*.swift' | wc -l | tr -d ' ')
