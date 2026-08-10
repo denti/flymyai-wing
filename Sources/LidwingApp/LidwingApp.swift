@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStateChange = { [weak statusItem] in
             statusItem?.refresh()
         }
+        MainMenu.install(into: NSApplication.shared)
         coordinator.start()
         statusItem.refresh()
 
@@ -64,6 +65,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             source.resume()
             signalSources.append(source)
         }
+    }
+
+    /// The Help menu's one row. Named for what it does, because a "Lidwing Help" row without a
+    /// real Help Book opens nothing at all.
+    @objc func showWhatItChanges() {
+        let alert = NSAlert()
+        alert.messageText = "What Lidwing changes on your Mac"
+        alert.informativeText = [
+            "One kernel flag, and it is not stored anywhere.",
+            "",
+            "While Lidwing is on it sets the clamshell sleep-disable bit on IOPMrootDomain and",
+            "holds a named power assertion. It writes no pmset settings, it needs no password,",
+            "and it installs nothing outside its own folder.",
+            "",
+            "macOS resets that flag to zero every time your Mac starts, so a restart always",
+            "clears it - even if you have already deleted Lidwing.",
+            "",
+            "Check it yourself, with Lidwing on and then off:",
+            "  ioreg -r -c IOPMrootDomain -d 1 | grep AppleClamshellCausesSleep",
+            "  pmset -g assertions | grep -i lidwing"
+        ].joined(separator: "\n")
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

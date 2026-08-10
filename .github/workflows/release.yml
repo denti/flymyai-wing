@@ -1,0 +1,160 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (must already exist)'
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Lidwing
+  BUNDLE_ID: ai.flymy.lidwing
+  MACOS_MIN: '12.0'
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write        # to create the release
+      id-token: write        # for build provenance
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Select the pinned toolchain
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+
+      # A release that ships a binary whose tests were never run is how a project ships a
+      # regression it already knew about.
+      - name: Tests
+        run: swift test 2>&1 | tee release-test.log
+
+      - name: Assert the tests actually ran
+        run: |
+          set -euo pipefail
+          COUNT=$(grep -Eo 'Executed [0-9]+ tests' release-test.log | tail -1 | grep -Eo '[0-9]+')
+          echo "collected $COUNT tests"
+          test "$COUNT" -ge 100
+
+      - name: Build universal and assemble the app
+        run: ./Scripts/build.sh
+
+      - name: Import Developer ID
+        id: cert
+        if: env.MACOS_CERT_P12 != ''
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          PASSWORD="$(openssl rand -hex 20)"
+          security create-keychain -p "$PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PASSWORD" \
+            "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "have_cert=true" >> "$GITHUB_OUTPUT"
+
+      - name: Sign
+        env:
+          SIGN_ID: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: ./Scripts/sign.sh "${SIGN_ID:--}"
+
+      - name: Notarize and staple
+        if: steps.cert.outputs.have_cert == 'true'
+        env:
+          AC_KEY: ${{ secrets.AC_API_KEY_P8 }}
+          AC_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_ISSUER: ${{ secrets.AC_API_ISSUER_ID }}
+        run: ./Scripts/notarize.sh
+
+      # Order below is not negotiable. Stapling REWRITES the disk image, so a checksum or an
+      # attestation taken before it is wrong for every single downloader — which turns the
+      # README's headline verification command into a red error for everyone, which is worse
+      # than publishing no attestation at all.
+      #
+      #   1. package (dmg + zip)   2. staple, inside package.sh   3. attest   4. checksum
+      - name: Package, staple, then checksum
+        env:
+          SIGN_ID: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: ./Scripts/package.sh
+
+      - name: Artifact invariants
+        run: ./Scripts/invariants.sh
+
+      - name: Symbols
+        run: |
+          set -euo pipefail
+          VERSION="$(git describe --tags --abbrev=0 | sed 's/^v//')"
+          # A universal binary has a different debug UUID per slice, and a crash report matches
+          # exactly one of them. Ship the whole fat dSYM, never a thinned one.
+          if [ -d "dist/$APP_NAME.app.dSYM" ]; then
+            ditto -c -k --keepParent "dist/$APP_NAME.app.dSYM" \
+              "dist/$APP_NAME-$VERSION-dSYMs.zip"
+          else
+            echo "no dSYM produced by this build; skipping (and saying so rather than failing silently)"
+          fi
+
+      - name: Attest the stapled artifacts
+        if: steps.cert.outputs.have_cert == 'true'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2
+        with:
+          subject-path: 'dist/*.dmg'
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Verify this download"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "Then check that Apple signed it, that it declares no permissions, and that it"
+            echo "cannot open a network connection:"
+            echo
+            echo '```'
+            echo 'spctl -a -vvv -t exec /Applications/Lidwing.app'
+            echo 'plutil -p /Applications/Lidwing.app/Contents/Info.plist | grep -i UsageDescription'
+            echo 'codesign -d --entitlements - /Applications/Lidwing.app'
+            echo '```'
+            echo
+            echo "The last two return nothing. That is the point."
+          } > release-notes.md
+
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" --notes-file release-notes.md \
+            $(find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' -o -name 'SHA256SUMS.txt' \))
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        if: always()
+        with:
+          name: release-logs
+          path: |
+            release-test.log
+            dist/SHA256SUMS.txt
