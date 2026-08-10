@@ -87,6 +87,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         for item in buildItems() { menu.addItem(item) }
+        // The user is looking, so "your agent is waiting" stops being news.
+        coordinator.acknowledgeAgentWaiting()
     }
 
     func buildMenu() -> NSMenu {
@@ -101,6 +103,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let content = MenuPresenter.content(for: snapshot)
         var items: [NSMenuItem] = []
 
+        if let waiting = coordinator.agentIsWaiting {
+            let name = waiting.source == "hook" ? "Your coding agent" : waiting.source
+            items.append(disabled("\(name) is waiting for you", secondary: false))
+            items.append(.separator())
+        }
         items.append(disabled(content.headline, secondary: false))
         if let detail = content.detail {
             items.append(disabled(detail, secondary: true))

@@ -17,6 +17,11 @@ final class AppCoordinator {
     private let chimes = ChimePlayer()
     private let preferences = Preferences.shared
     private var observers: SystemObservers?
+    private var notifyServer: NotifyServer?
+    /// Set when a coding agent says it is blocked, cleared when the user opens the menu.
+    /// Advisory only: invariant I8 means nothing on that socket can arm anything, and this
+    /// property is the entire extent of its reach into the app.
+    private(set) var agentIsWaiting: (source: String, at: Date)?
 
     private var verifyTimer: DispatchSourceTimer?
     private var reassertTimer: DispatchSourceTimer?
@@ -74,6 +79,14 @@ final class AppCoordinator {
         observers.start()
         self.observers = observers
 
+        // Advisory only. This server has no reference to the state machine and no way to
+        // reach one.
+        let notify = NotifyServer { [weak self] signal in
+            self?.agentSignalled(signal)
+        }
+        notify.start()
+        notifyServer = notify
+
         readWatchdogRecoveryRecord()
         deliver(machine.handle(.launch))
         // No timer is started here. The guards exist to end an armed session, so they run for
@@ -85,6 +98,8 @@ final class AppCoordinator {
         deliver(machine.handle(.appWillTerminate))
         observers?.stop()
         observers = nil
+        notifyServer?.stop()
+        notifyServer = nil
         stopTimer(.verify)
         stopTimer(.reassert)
         stopTimer(.reconcile)
@@ -157,6 +172,24 @@ final class AppCoordinator {
         case .thermalChanged:
             deliver(machine.handle(.thermalChanged))
         }
+    }
+
+    /// A coding agent said it is blocked. The only three things this is allowed to do.
+    private func agentSignalled(_ signal: NotifyServer.Signal) {
+        agentIsWaiting = (source: signal.source, at: Date())
+        chimes.play(.agentWaiting)
+        let name = signal.source == "hook" ? "Your coding agent" : signal.source
+        postNotification(title: "\(name) is waiting for you",
+                         body: signal.body.isEmpty ? "It needs an answer before it can carry on."
+                                                   : signal.body)
+        onStateChange?()
+    }
+
+    /// Cleared when the user looks at the menu: they have seen it, so it stops being news.
+    func acknowledgeAgentWaiting() {
+        guard agentIsWaiting != nil else { return }
+        agentIsWaiting = nil
+        onStateChange?()
     }
 
     // MARK: effects out

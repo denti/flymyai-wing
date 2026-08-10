@@ -29,6 +29,7 @@ final class ChimePlayer {
         prepare(.sealed, file: "Submarine")
         prepare(.standingDown, file: "Bottle")
         prepare(.failure, file: "Basso")
+        prepare(.agentWaiting, file: "Ping")
     }
 
     deinit {

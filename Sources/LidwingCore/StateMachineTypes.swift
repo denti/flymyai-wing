@@ -80,6 +80,9 @@ public enum Chime: String, Equatable, Sendable {
     case standingDown
     /// Something failed.
     case failure
+    /// A coding agent is blocked and needs the user. Requested explicitly: with the lid shut
+    /// this is the only way they find out before their run has been idle for an hour.
+    case agentWaiting
 }
 
 public enum UserNotice: Equatable, Sendable {
