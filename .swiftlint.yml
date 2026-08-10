@@ -52,7 +52,9 @@ identifier_name:
   min_length:
     warning: 2
     error: 1
-  excluded: [id, on, at, kr, os, t0, pc]
+  # `x` and `y` on a geometric point are the correct names; anything else here is a
+  # domain abbreviation that reads worse spelled out.
+  excluded: [id, on, at, kr, os, t0, pc, x, y]
 
 nesting:
   type_level: 2

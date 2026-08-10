@@ -70,37 +70,29 @@ enum StatusIcon {
         }
     }
 
-    /// A swept wing with three feather notches. Three, because more does not survive 22 pt,
-    /// and every gap is at least 1 pt or the feathers merge into an unidentifiable smear.
+    /// Renders the shared geometry from `LidwingCore.WingGeometry`. The menu-bar glyph and
+    /// the app icon are the same path scaled differently; a glyph that exists twice is a glyph
+    /// that will differ once.
     private static func wingPath(in box: NSRect) -> NSBezierPath {
         let path = NSBezierPath()
-        let width = box.width
-        let height = box.height
-        func point(_ across: CGFloat, _ up: CGFloat) -> NSPoint {
-            NSPoint(x: box.minX + across * width, y: box.minY + up * height)
+        func place(_ point: WingGeometry.Point) -> NSPoint {
+            NSPoint(x: box.minX + CGFloat(point.x) * box.width,
+                    y: box.minY + CGFloat(point.y) * box.height)
         }
-
-        // Leading edge: a long sweep from the shoulder at the right down to the tip at the left.
-        path.move(to: point(1.00, 0.92))
-        path.curve(to: point(0.34, 0.58),
-                   controlPoint1: point(0.78, 0.98),
-                   controlPoint2: point(0.52, 0.82))
-        path.curve(to: point(0.00, 0.20),
-                   controlPoint1: point(0.20, 0.44),
-                   controlPoint2: point(0.06, 0.30))
-
-        // Trailing edge with three notches, walking back towards the shoulder.
-        path.line(to: point(0.14, 0.10))
-        path.line(to: point(0.24, 0.30))     // notch 1
-        path.line(to: point(0.36, 0.06))
-        path.line(to: point(0.48, 0.34))     // notch 2
-        path.line(to: point(0.62, 0.10))
-        path.line(to: point(0.74, 0.42))     // notch 3
-        path.line(to: point(0.90, 0.24))
-        path.curve(to: point(1.00, 0.92),
-                   controlPoint1: point(1.00, 0.46),
-                   controlPoint2: point(1.02, 0.72))
-        path.close()
+        for segment in WingGeometry.outline {
+            switch segment {
+            case .move(let point):
+                path.move(to: place(point))
+            case .line(let point):
+                path.line(to: place(point))
+            case .curve(let point, let control1, let control2):
+                path.curve(to: place(point),
+                           controlPoint1: place(control1),
+                           controlPoint2: place(control2))
+            case .close:
+                path.close()
+            }
+        }
         return path
     }
 

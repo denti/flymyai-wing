@@ -126,3 +126,70 @@ jobs:
       - run: xcodebuild -version && sw_vers
       - run: swift build -c release 2>&1 | tail -40
       - run: swift test 2>&1 | tail -40
+
+  # Everything a user actually downloads: the universal binaries, the .app, the signature and
+  # the artifact invariants. Ad-hoc signed until a Developer ID secret exists; the same script
+  # takes the real identity the moment one does, with no rewrite.
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    needs: [test-macos, lint]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+        with:
+          fetch-depth: 0
+      - name: Select the pinned toolchain
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+          fi
+      - name: Build universal and assemble the app
+        run: ./Scripts/build.sh
+      - name: Import Developer ID (absent secret falls back to ad-hoc)
+        id: cert
+        if: ${{ secrets.MACOS_CERT_P12 != '' }}
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          PASSWORD="$(openssl rand -hex 20)"
+          security create-keychain -p "$PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PASSWORD" "$KEYCHAIN"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PASSWORD" \
+            "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "have_cert=true" >> "$GITHUB_OUTPUT"
+      - name: Sign
+        env:
+          SIGN_ID: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: ./Scripts/sign.sh "${SIGN_ID:--}"
+      - name: Notarize and staple
+        if: steps.cert.outputs.have_cert == 'true'
+        env:
+          AC_KEY: ${{ secrets.AC_API_KEY_P8 }}
+          AC_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_ISSUER: ${{ secrets.AC_API_ISSUER_ID }}
+        run: ./Scripts/notarize.sh
+      - name: Package
+        env:
+          SIGN_ID: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: ./Scripts/package.sh
+      - name: Artifact invariants
+        run: ./Scripts/invariants.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ github.sha }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          retention-days: 14
