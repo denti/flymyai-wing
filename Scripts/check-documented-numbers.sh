@@ -2,9 +2,13 @@
 # Numbers this project publishes about itself must match the repository.
 #
 # TESTING.md claimed "20 (ControlSocketTests 6, NotifyServerTests 8, StorageTests 3,
-# IntegrationInstallerTests 7)". Four things wrong in one line: the breakdown summed to 24, not
-# 20; the real total was 27; and `StorageTests` did not exist at all. Nobody noticed, because a
-# number in a document is not checked by anything.
+# IntegrationInstallerTests 7)". The breakdown summed to 24, not 20, and the real total was 27.
+#
+# The first version of this check also reported that `StorageTests` did not exist, which was
+# wrong and cost a red build: it existed as a *class*, inside ControlSocketTests.swift. These
+# numbers count test classes, not files, so that is what this counts. The class has since been
+# moved into the file that bears its name - two classes of the same name in one module is a
+# compile error, which is how I found out.
 #
 # This product's whole argument is "prove it, don't claim it". A document full of measurements
 # that drifted is worse than one with no numbers, because it reads exactly like a measurement.
@@ -28,26 +32,34 @@ compare() {
 
 echo "== documented numbers"
 
-# Per-file counts in the macOS breakdown, each named with its file.
-while read -r name count; do
+# Counts every `func test` per XCTestCase class, wherever that class happens to live.
+class_counts() {
+  awk '/^final class [A-Za-z]+: XCTestCase/ { name=$3; sub(":","",name) }
+       /func test/ { if (name != "") count[name]++ }
+       END { for (k in count) print k, count[k] }' "$@" | sort
+}
+
+MACOS_COUNTS="$(class_counts Tests/LidwingSystemTests/*.swift)"
+
+while read -r name documented; do
   [ -n "$name" ] || continue
-  file="Tests/LidwingSystemTests/${name}.swift"
-  if [ ! -f "$file" ]; then
-    echo "  FAIL  TESTING.md describes $name, which does not exist"
+  actual="$(printf '%s\n' "$MACOS_COUNTS" | awk -v n="$name" '$1==n {print $2}')"
+  if [ -z "$actual" ]; then
+    echo "  FAIL  TESTING.md describes a class $name that no macOS test file declares"
     FAIL=1
     continue
   fi
-  compare "$name" "$count" "$(grep -c 'func test' "$file")"
+  compare "$name" "$documented" "$actual"
 done < <(grep -oE '`[A-Za-z]+Tests` [0-9]+' TESTING.md | tr -d '`')
 
-# Every macOS test file must appear in that breakdown, or the total is right by luck.
-for file in Tests/LidwingSystemTests/*.swift; do
-  name="$(basename "$file" .swift)"
+# Every class must appear in that breakdown, or a matching total is luck.
+while read -r name _; do
+  [ -n "$name" ] || continue
   if ! grep -q "\`$name\`" TESTING.md; then
-    echo "  FAIL  $name exists and TESTING.md does not mention it"
+    echo "  FAIL  the class $name exists and TESTING.md does not mention it"
     FAIL=1
   fi
-done
+done < <(printf '%s\n' "$MACOS_COUNTS")
 
 # The Linux suite total, from the summary table.
 DOC_LINUX="$(grep -oE '^\| Tests \| \*\*[0-9]+\*\*' TESTING.md | head -1 | grep -oE '[0-9]+')"
@@ -56,7 +68,7 @@ compare "Linux test count" "$DOC_LINUX" "$ACTUAL_LINUX"
 
 # The macOS total, and its own breakdown.
 DOC_MACOS="$(grep -oE '\| Tests \| \*\*[0-9]+\*\* \(`' TESTING.md | grep -oE '[0-9]+')"
-ACTUAL_MACOS="$(grep -ch 'func test' Tests/LidwingSystemTests/*.swift | paste -sd+ - | bc)"
+ACTUAL_MACOS="$(printf '%s\n' "$MACOS_COUNTS" | awk '{s+=$2} END {print s+0}')"
 compare "macOS test count" "$DOC_MACOS" "$ACTUAL_MACOS"
 
 SUM="$(grep -oE '`[A-Za-z]+Tests` [0-9]+' TESTING.md | grep -oE '[0-9]+$' | paste -sd+ - | bc)"

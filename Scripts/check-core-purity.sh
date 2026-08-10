@@ -97,6 +97,67 @@ while IFS=: read -r file line _; do
   fi
 done < <(grep -rn "runModal()" Sources/LidwingApp/*.swift 2>/dev/null)
 
+# ---------------------------------------------------------------------------------------
+# 6. A workflow step that pipes must set pipefail.
+#
+# GitHub runs `run:` blocks under `bash -e`, which does *not* set pipefail, so in
+# `swift test | tee log` it is `tee` that decides the step's exit code. A compile error then
+# reads as a passing step. Not hypothetical: run 31429307962 had a macOS build failure and the
+# "Unit tests" step went green, leaving the count guard to notice - far too late for something
+# the compiler already knew, and the same masking made the macos-26 canary incapable of
+# reporting a failing test at all.
+#
+# Parsed as blocks rather than by looking a few lines back. The first version of this check
+# searched the twelve preceding lines for the word `pipefail` and found the *previous step's*,
+# so its positive control did not fire. A check that cannot fail is worse than no check.
+PIPEFAIL_REPORT="$(awk '
+  # A single-line `run:` that pipes. There is nowhere for a pipefail to live except this line.
+  /^[[:space:]]*-?[[:space:]]*run:[[:space:]]*[^|[:space:]]/ {
+    if ($0 ~ /\|[[:space:]]*(tee|tail|head|grep|sort|awk|sed)/ && $0 !~ /pipefail/) {
+      printf "%s:%d: single-line run pipes without pipefail\n", FILENAME, FNR
+    }
+    inblock = 0
+    next
+  }
+  # A block scalar. Remember where it started and how far it is indented.
+  /^[[:space:]]*-?[[:space:]]*run:[[:space:]]*\|/ {
+    if (inblock && piped && !safe) {
+      printf "%s:%d: run block pipes without pipefail\n", FILENAME, blockline
+    }
+    inblock = 1; piped = 0; safe = 0; blockline = FNR
+    match($0, /^[[:space:]]*/); indent = RLENGTH
+    next
+  }
+  inblock {
+    # A line at or below the block indentation ends it.
+    if ($0 ~ /[^[:space:]]/) {
+      match($0, /^[[:space:]]*/)
+      if (RLENGTH <= indent) {
+        if (piped && !safe) {
+          printf "%s:%d: run block pipes without pipefail\n", FILENAME, blockline
+        }
+        inblock = 0
+        next
+      }
+    }
+    if ($0 ~ /pipefail/) safe = 1
+    if ($0 ~ /\|[[:space:]]*(tee|tail|head|grep|sort|awk|sed)/) piped = 1
+  }
+  END {
+    if (inblock && piped && !safe) {
+      printf "%s:%d: run block pipes without pipefail\n", FILENAME, blockline
+    }
+  }
+' .github/workflows/*.yml 2>/dev/null)"
+
+if [ -n "$PIPEFAIL_REPORT" ]; then
+  printf '%s\n' "$PIPEFAIL_REPORT" | while IFS= read -r line; do
+    echo "FAIL: $line"
+  done
+  echo "      \`tee\` and \`tail\` return 0, so the command before them cannot fail the step."
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   # Assert on real output, never on the absence of an error: prove we actually looked at files.
   COUNT=$(find "$CORE" -name '*.swift' | wc -l | tr -d ' ')

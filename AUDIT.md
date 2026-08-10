@@ -498,7 +498,14 @@ same Mac, and that is the one these findings are about.
 | 9.1 | **The state directory's mode was set once and never checked again.** `ensure()` returned as soon as the path existed, so a directory that arrived any other way kept its mode forever - restored from a backup that lost it, migrated by Setup Assistant, created by an earlier build, or made by hand. `createDirectory` neither corrects an existing directory nor complains about one. Inside it: the ledger, the audit log of when this Mac was awake and which agent binaries ran, and both sockets. | Medium | Verify and repair on every launch. The rule is "grants nothing to group or other" rather than "is exactly 0700", so bits it has no opinion about survive and it does not re-chmod a private directory forever. |
 | 9.2 | **`fileExists` follows symlinks**, so a symlink pointing anywhere at all reported a perfectly good state directory. | Medium | `lstat`, and refuse. A symlink is not something that can be repaired, and the honest answer is to decline rather than write the ledger somewhere the user did not choose. A plain file in that position is refused too. |
 | 9.3 | **The control socket was chmod-ed one call after `bind` created it**, so it existed briefly with whatever the process umask allowed. Nothing was reachable through that window, because the containing directory is 0700 - but "unreachable because of the directory" is one mistake away from "reachable". | Low | `umask(0o077)` around the bind, so it is private from the instant it exists. The chmod stays as belt and braces. |
-| 9.4 | **TESTING.md described a test file that does not exist.** It claimed 20 macOS tests as `ControlSocketTests` 6, `NotifyServerTests` 8, `StorageTests` 3, `IntegrationInstallerTests` 7 - a breakdown summing to 24, against a real total of 27, naming a `StorageTests` that was never written. In a project whose argument is "prove it, don't claim it", a document full of measurements that quietly drifted is worse than one with no numbers, because it reads exactly like a measurement. | Medium | Fixed, and `Scripts/check-documented-numbers.sh` now checks every one of those numbers against the repository on each run. Five positive controls, one of which was the live defect. `StorageTests` now exists and holds the syscall-level tests for 9.1 to 9.3. |
+| 9.4 | **TESTING.md's numbers had drifted.** It claimed 20 macOS tests as `ControlSocketTests` 6, `NotifyServerTests` 8, `StorageTests` 3, `IntegrationInstallerTests` 7 - a breakdown summing to 24, against a real total of 27. In a project whose argument is "prove it, don't claim it", a document full of measurements that quietly drifted is worse than one with no numbers, because it reads exactly like a measurement. | Medium | Fixed, and `Scripts/check-documented-numbers.sh` now checks every one of those numbers against the repository on each run. |
+
+**Correction to 9.4, from the red build it caused.** I also wrote that `StorageTests` "was never
+written". That was wrong. It existed as a *class*, inside `ControlSocketTests.swift` - these
+numbers count classes, and I read them as files. My check inherited the same mistake and looked
+for a file, so it reported a missing test suite that was there all along, and I wrote a second
+class of the same name, which is a compile error. The class now lives in the file that bears its
+name, and the check counts classes wherever they are declared.
 
 ### Findings, rejected
 
@@ -508,7 +515,19 @@ same Mac, and that is the one these findings are about.
 | "The ledger should be signed or checksummed so a tampered one is detected." | Tampering with it requires being the user, who can equally well set the clamshell bit directly with the same unprivileged call Lidwing uses. A signature would protect nothing and would imply a threat model this product does not have. Corruption, as opposed to tampering, is already handled: an unparseable ledger is treated as absent and the machine's own ground truth decides. |
 | "`ensure()` should refuse a too-open directory rather than repairing it." | It is our own directory and the user did not choose its mode. Refusing would disable the product over something that can simply be fixed. A symlink is different, and is refused, because there is no correct repair for it. |
 
-**Round 9 verdict:** four defects, none capable of stranding a Mac, three of them about other
+### The red build, which was worth more than the round
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 9.5 | **A compile failure reported as a passing step.** `swift test 2>&1 \| tee macos-test.log` runs under `bash -e`, which does not set `pipefail`, so `tee` decides the step's exit code. In run 31429307962 the macOS build failed and the "Unit tests" step went **green**; the job only went red at the count guard two steps later. A guard is not supposed to be the first thing that notices a compile error. | High | `set -o pipefail` on all six masked steps, and a check that parses the workflows for `run:` blocks that pipe without it. |
+| 9.6 | **The macOS 26 canary could not report a failing test at all.** Both its steps were `swift build \| tail -40` and `swift test \| tail -40`. Its entire purpose is to go red before a user does, and it was structurally incapable of it. Every green canary result recorded in this repository proved only that the runner started. | High | Same fix. Its greens mean something from now on; the ones before this commit do not. |
+
+The first version of the pipefail check searched the twelve preceding lines for the word
+`pipefail` and found the *previous step's*, so its positive control did not fire. It now parses
+block scalars properly, and all three shapes - a masked one-liner, a block with its `pipefail`
+deleted, and the canary restored to its old form - have been seen red.
+
+**Round 9 verdict:** six defects, none capable of stranding a Mac, three of them about other
 accounts on a shared Mac rather than about the same-uid attacker this product cannot defend
 against and does not claim to. The fourth was a document quietly claiming things that were not
 true, which in this project is a defect like any other.

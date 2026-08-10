@@ -41,7 +41,10 @@ jobs:
       # A release that ships a binary whose tests were never run is how a project ships a
       # regression it already knew about.
       - name: Tests
-        run: swift test 2>&1 | tee release-test.log
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee release-test.log
 
       - name: Assert the tests actually ran
         run: |

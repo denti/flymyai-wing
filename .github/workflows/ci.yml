@@ -32,10 +32,21 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - name: Swift version
         run: swift --version
+      # `set -o pipefail` on every one of these. Without it `tee` decides the step's exit code,
+      # so a compile error reads as a passing step - which is exactly what happened in run
+      # 31429307962: `swift test` failed to build and the step went green. Only the count guard
+      # below caught it, and a guard is not supposed to be the first thing that notices a
+      # compile error.
       - name: Build with warnings as errors
-        run: swift build -Xswiftc -warnings-as-errors 2>&1 | tee build.log
+        shell: bash
+        run: |
+          set -o pipefail
+          swift build -Xswiftc -warnings-as-errors 2>&1 | tee build.log
       - name: Unit tests
-        run: swift test 2>&1 | tee linux-test.log
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee linux-test.log
       - name: Assert the tests actually ran
         # An empty result is a red result. A suite that collected zero tests has proved
         # nothing, and a pipeline that reads "no failures" from silence is how a green board
@@ -111,7 +122,10 @@ jobs:
       - name: Build with warnings as errors
         run: swift build -Xswiftc -warnings-as-errors
       - name: Unit tests
-        run: swift test 2>&1 | tee macos-test.log
+        shell: bash
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee macos-test.log
       # Also run on macOS: this is the platform the helper actually ships to, and the timing
       # budget is about a real user's agent rather than a container.
       - name: Notify-helper behaviour
@@ -156,8 +170,16 @@ jobs:
         with:
           fetch-depth: 0
       - run: xcodebuild -version && sw_vers
-      - run: swift build -c release 2>&1 | tail -40
-      - run: swift test 2>&1 | tail -40
+      # These two were the worst of the masked pipes: the canary exists to go red before a user
+      # does, and `| tail` meant it reported success no matter what the tests did.
+      - shell: bash
+        run: |
+          set -o pipefail
+          swift build -c release 2>&1 | tail -40
+      - shell: bash
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tail -40
 
   # Everything a user actually downloads: the universal binaries, the .app, the signature and
   # the artifact invariants. Ad-hoc signed until a Developer ID secret exists; the same script

@@ -96,7 +96,7 @@ Broadening that coverage is on the list in §6.
 | | |
 |---|---|
 | Command | `swift test` on `macos-15` |
-| Tests | **33** (`ControlSocketTests` 9, `NotifyServerTests` 9, `StorageTests` 6, `IntegrationInstallerTests` 9) on top of the suite shared with Linux |
+| Tests | **33** (`ControlSocketTests` 6, `NotifyServerTests` 9, `StorageTests` 9, `IntegrationInstallerTests` 9) on top of the suite shared with Linux |
 | Covers | the control-socket wire format, an `AF_UNIX` loopback, socket permissions, the ledger's temp-file-plus-`rename` write, the audit log's append and read-back |
 | Cannot cover | anything needing a lid, a battery, a real power event, or a window server (§5) |
 

@@ -83,6 +83,7 @@ Nothing is idling on any of these.
 | Bundle contract | The build script, the signing script and the runtime name the same files in three places. A script checks they agree, with five positive controls |
 | State on disk | The directory is verified and repaired on every launch rather than trusted from its creation; a symlink in its place is refused; sockets are private from the instant `bind` creates them |
 | Documented numbers | Every test count this repository publishes about itself is checked against the repository. It was wrong when the check was written |
+| Workflow pipes | Every `run:` block that pipes is checked for `set -o pipefail`, parsed as block scalars rather than by proximity. Six steps were masking their exit codes, two of them the canary's |
 | macOS updates | The build on which an arm last verified is remembered; a change is noticed at launch and reported by the next verified arm. Nothing probes, because nothing may arm unasked |
 | Sound self-check | Fallbacks per chime, a Play button, and a check that names what is missing. Sound is the only channel once the lid is shut |
 | Launch at login | `SMAppService` only, never ticked by default, and the checkbox is read from the live system status rather than a boolean of ours - the one a user can revoke while the app is not running. No checkbox at all on macOS 12, where the only mechanisms are the two the antipattern list forbids |
@@ -106,7 +107,7 @@ Nothing is idling on any of these.
 
 | Round | Method | Worst finding |
 |---|---|---|
-| 9 (read as an attacker) | Assume a hostile same-uid process, and a Mac with more than one account | **The state directory's mode was set once and never checked again**, and the check that looked for it followed symlinks. Inside that directory: the ledger, both sockets, and an audit log of when this Mac was awake and which agent binaries ran. A directory that arrived from a restored backup, a migration or an earlier build kept whatever mode it had, forever. |
+| 9 (read as an attacker, then a red build) | Assume a hostile same-uid process and a shared Mac; then read the CI that failed | **A compile failure reported as a passing step**, because `swift test \| tee log` runs under `bash -e` with no `pipefail` and `tee` decides the exit code. The `macos-26` canary had the same shape in both its steps, so the job whose entire purpose is to go red before a user does was structurally incapable of reporting a failing test. Every green canary before this commit proved only that the runner started. |
 | 8 (the spec beside the code) | Read `CRAFT.md` §8 and all fifty antipatterns in §11 against the implementation | **Three of the five Settings controls had no help text at all.** The tooltip and the spoken explanation were attached behind `as? NSButton`; a segmented control and two pop-ups are not buttons, and one call site handed the cast a stack view, which could never match. The two silent rows were the battery floor and the duration limit - the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is why it looked fine. |
 | 7 (CI behaving oddly) | A macOS job stopped making progress | **A test that hung instead of failing.** `sun_path` is 104 bytes on macOS and 108 on Linux; the test's socket path fitted only the larger. The listener's `strncpy` truncated and bound elsewhere, `lidwing-notify` correctly refused the over-long path, and `accept()` waited forever. Everything that waits now has a deadline. |
 | 6 (code vs the specification) | Read the transitions with `DESIGN.md` open beside them | **On a Mac with no lid, nothing ever concluded that.** `lidState` correctly stays `.unknown` while the lid driver has not reported — but nothing turned that into a decision, so on a Mac mini the state stayed `.unknown` forever and the user could turn Lidwing on and read *"Awake — you can close the lid"*. |
@@ -115,7 +116,7 @@ Nothing is idling on any of these.
 | 2 | Read as a running process | A modal dialog spins its own run loop, so the reconcile timer fired underneath one and could stack a second dialog on top. And a verify tick that returned early without stopping its own 10 Hz timer. |
 | 3 | Fresh eyes, trace every write | **High.** The Repair button could not clear a bit left behind by a previous process, and reported success. It survived two audits and 135 passing tests because `MockSystem` wrote unconditionally — a mock more permissive than the machine does not test, it reassures. |
 
-Twenty-six rejected findings are recorded with their reasons.
+Twenty-six rejected findings are recorded with their reasons, and one **corrected** finding: I reported a test suite as missing when it existed under another file, and that mistake cost a red build.
 
 ## NEXT
 
