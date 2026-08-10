@@ -62,6 +62,16 @@ final class AppCoordinator {
                                pid: pid)
         machine.mode = preferences.mode
         machine.hasEverArmed = preferences.hasEverArmed
+        machine.lastVerifiedOS = preferences.lastVerifiedOS
+        // Logged here rather than from the state machine, which has no logger and should not
+        // grow one. Same pure comparison, so there is only one rule about what counts as a
+        // change - and it is recorded even if the user never arms again, because this is the
+        // line that explains a support report six weeks from now.
+        if case .changed(let from, let to) = OSChangeWatch.compare(
+            lastVerifiedOS: preferences.lastVerifiedOS,
+            current: ProcessInfo.processInfo.operatingSystemVersionString) {
+            Log.shared.emit(.osChanged, .lifecycle, ["from": from, "to": to])
+        }
         chimes.enabled = preferences.soundEnabled
 
         watchdog.launchWatchdog = { WatchdogInstaller.ensureRunning() }
@@ -277,37 +287,48 @@ final class AppCoordinator {
 
     // MARK: effects out
 
+    /// Performs one effect. Returns whether the menu has to be rebuilt afterwards.
+    ///
+    /// Split out of `deliver` when the switch crossed the complexity limit. That limit earns its
+    /// keep here: this is the one function every effect in the product passes through, and a
+    /// long switch is where a `case` quietly gets added next to the wrong neighbour.
+    private func perform(_ effect: LidwingEffect) -> Bool {
+        switch effect {
+        case .startTimer(let timer):
+            startTimer(timer)
+        case .stopTimer(let timer):
+            stopTimer(timer)
+        case .chime(let chime):
+            chimes.play(chime)
+        case .notify(let notice):
+            present(notice)
+        case .allowPowerChange(let argument):
+            observers?.allowPowerChange(argument)
+        case .requestSystemSleep:
+            system.requestSystemSleep()
+        case .refuseArm(let refusal):
+            log.emit(LogCatalogue.armRefused, .power,
+                     ["reason": String(describing: refusal)])
+            presentRefusal(refusal)
+        case .offerRepair(let cause):
+            presentRepair(cause)
+        case .beginActivity:
+            beginActivity()
+        case .endActivity:
+            endActivity()
+        case .recordVerifiedOS(let os):
+            preferences.lastVerifiedOS = os
+            log.emit(.osRecheckPassed, .lifecycle, ["to": os])
+        case .showForeignHolder, .uiNeedsRefresh:
+            return true
+        }
+        return false
+    }
+
     func deliver(_ effects: [LidwingEffect]) {
         var needsRefresh = false
-        for effect in effects {
-            switch effect {
-            case .startTimer(let timer):
-                startTimer(timer)
-            case .stopTimer(let timer):
-                stopTimer(timer)
-            case .chime(let chime):
-                chimes.play(chime)
-            case .notify(let notice):
-                present(notice)
-            case .allowPowerChange(let argument):
-                observers?.allowPowerChange(argument)
-            case .requestSystemSleep:
-                system.requestSystemSleep()
-            case .refuseArm(let refusal):
-                log.emit(LogCatalogue.armRefused, .power,
-                         ["reason": String(describing: refusal)])
-                presentRefusal(refusal)
-            case .offerRepair(let cause):
-                presentRepair(cause)
-            case .showForeignHolder:
-                needsRefresh = true
-            case .beginActivity:
-                beginActivity()
-            case .endActivity:
-                endActivity()
-            case .uiNeedsRefresh:
-                needsRefresh = true
-            }
+        for effect in effects where perform(effect) {
+            needsRefresh = true
         }
         if preferences.hasEverArmed != machine.hasEverArmed {
             preferences.hasEverArmed = machine.hasEverArmed

@@ -20,6 +20,7 @@ final class Preferences {
         static let hasEverArmed = "hasEverArmed"
         static let lastBagWarning = "lastBagWarningAt"
         static let soundEnabled = "soundEnabled"
+        static let lastVerifiedOS = "lastVerifiedOS"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -55,6 +56,14 @@ final class Preferences {
     var mode: LidwingMode {
         get { LidwingMode(rawValue: defaults.string(forKey: Key.mode) ?? "") ?? .manual }
         set { defaults.set(newValue.rawValue, forKey: Key.mode) }
+    }
+
+    /// The macOS build on which an arm last verified against ground truth. Deliberately not
+    /// registered with a default: absent means "no arm has ever verified here", which is a
+    /// first run, and an empty-string default would make a first run look like an OS change.
+    var lastVerifiedOS: String? {
+        get { defaults.string(forKey: Key.lastVerifiedOS) }
+        set { defaults.set(newValue, forKey: Key.lastVerifiedOS) }
     }
 
     var hasEverArmed: Bool {

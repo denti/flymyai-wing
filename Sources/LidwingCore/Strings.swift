@@ -76,6 +76,11 @@ public enum StringKey {
         StringEntry("tip.slept", "Click for details - this Mac slept while protected",
          "Tooltip after the machine slept despite protection. The one failure that matters."),
 
+        StringEntry("notify.osRechecked.title", "macOS changed, and Lidwing still works",
+         "Notification after the first successful arm following a macOS update."),
+        StringEntry("notify.osRechecked.body", "Checked against %1$@ just now, not assumed.",
+         "%1$@ is a macOS version string such as \"Version 15.6 (Build 24G84)\"."),
+
         // Menu — the entire visible surface of the product.
         StringEntry("menu.toggle", "Keep Awake with the Lid Closed",
          "The one command in the menu. Title case."),

@@ -54,6 +54,15 @@ public enum LogCatalogue {
     public static let launch = LogEvent(
         name: "launch", level: .notice,
         publicFields: ["version", "build", "os", "arch", "state"])
+    /// macOS changed since the last arm that verified the mechanism. Recorded even if the user
+    /// never arms again, because this is the line that explains a support report six weeks later.
+    public static let osChanged = LogEvent(
+        name: "os_changed", level: .notice,
+        publicFields: ["from", "to"])
+    /// An arm verified against ground truth on the new build. The selector still works here.
+    public static let osRecheckPassed = LogEvent(
+        name: "os_recheck_passed", level: .notice,
+        publicFields: ["from", "to"])
     public static let reconciled = LogEvent(
         name: "reconciled", level: .notice,
         publicFields: ["decision", "cause"])
@@ -141,7 +150,7 @@ public enum LogCatalogue {
         publicFields: ["succeeded", "residue"])
 
     public static let all: [LogEvent] = [
-        launch, reconciled, terminating,
+        launch, osChanged, osRecheckPassed, reconciled, terminating,
         armRequested, armRefused, armApplied, armVerified, armNoEffect,
         reasserted, disarmed, releaseNoEffect, sleptWhileArmed, groundTruthLost,
         thermalState, batteryGuard,

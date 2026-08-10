@@ -91,6 +91,14 @@ extension AppCoordinator {
                                  "Don't put your Mac in a bag while Lidwing is on"),
                     Strings.text("notify.bag.body",
                                  "With the lid closed and no airflow it can get very hot."))
+        case .recheckedAfterOSUpdate(_, let to):
+            // Said once, after the first arm that verifies on a new build. The reassurance is
+            // only worth an interruption because the alternative - this product silently not
+            // working after a macOS update - is the failure it is most likely to have.
+            return (Strings.text("notify.osRechecked.title",
+                                 "macOS changed, and Lidwing still works"),
+                    Strings.text("notify.osRechecked.body",
+                                 "Checked against %1$@ just now, not assumed.", to))
         }
     }
 

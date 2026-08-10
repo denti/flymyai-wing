@@ -59,6 +59,9 @@ public enum Translations {
         "tip.disarming": "Возвращаем обычный сон",
         "tip.slept": "Нажмите за подробностями - Mac уснул во время защиты",
 
+        "notify.osRechecked.title": "macOS обновилась, Lidwing по-прежнему работает",
+        "notify.osRechecked.body": "Только что проверено на %1$@, а не предположено.",
+
         "menu.toggle": "Не спать с закрытой крышкой",
         "menu.off": "Выключено - Mac засыпает как обычно",
         "menu.awake": "Не спит - можно закрывать крышку",

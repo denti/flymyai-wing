@@ -7,6 +7,20 @@ extension StateMachine {
     // MARK: Launch and reconciliation
 
     func onLaunch() -> [LidwingEffect] {
+        // Before anything else, and regardless of what the ledger says: did macOS change under
+        // us? This only records the question. Nothing here arms, and nothing here refuses.
+        switch OSChangeWatch.compare(lastVerifiedOS: lastVerifiedOS,
+                                     current: identity.osVersion) {
+        case .noBaseline, .unchanged:
+            pendingOSRecheck = nil
+        case .changed(let from, let to):
+            // Not an `audit.note`: that sink takes an `AuditFailure`, and a macOS update is not
+            // a failure. Widening that enum to fit would quietly change what `AuditRecord.
+            // failures` means - "what went wrong during this session" - for every reader of
+            // every audit line ever written. The host logs this one instead.
+            pendingOSRecheck = (from: from, to: to)
+        }
+
         if facade.lidState == .noLid {
             state = .unsupported
             return []
@@ -233,6 +247,18 @@ extension StateMachine {
             .startTimer(.reassert),
             .startTimer(.reconcile)
         ]
+        // This arm verified against ground truth, so the mechanism demonstrably still works on
+        // the build running right now. That is the only moment at which the OS is worth
+        // recording, and the only moment at which "it still works" is a fact rather than a hope.
+        if lastVerifiedOS != identity.osVersion {
+            effects.append(.recordVerifiedOS(identity.osVersion))
+            lastVerifiedOS = identity.osVersion
+        }
+        if let recheck = pendingOSRecheck {
+            pendingOSRecheck = nil
+            effects.append(.notify(.recheckedAfterOSUpdate(from: recheck.from, to: recheck.to)))
+        }
+
         // No chime here. The user is looking at the menu they just clicked.
         if !hasEverArmed {
             hasEverArmed = true

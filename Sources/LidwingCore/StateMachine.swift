@@ -50,6 +50,15 @@ public final class StateMachine {
     internal var agentGracePeriod: TimeInterval = 300
     internal var agentGoneSince: Date?
     internal var lastBagWarningAt: Date?
+
+    /// The macOS build on which an arm last verified. Set by the host from storage at launch;
+    /// updated by `.recordVerifiedOS` after each verified arm. `nil` means no arm has ever
+    /// verified on this machine, which is a first run and must stay quiet.
+    public var lastVerifiedOS: String?
+    /// Set at launch when `lastVerifiedOS` differs from the OS running now, and cleared by the
+    /// first arm that verifies. Deliberately not persisted: if the app never manages a verified
+    /// arm, the check is still pending on the next launch, which is the correct answer.
+    internal var pendingOSRecheck: (from: String, to: String)?
     /// Last known lid position, so a chime fires on the transition and not on every one of the
     /// four non-lid events that also deliver a clamshell notification.
     internal var lidWasClosed = false

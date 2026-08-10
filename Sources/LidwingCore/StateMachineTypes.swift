@@ -106,6 +106,9 @@ public enum UserNotice: Equatable, Sendable {
     case groundTruthLost
     /// Shown at most once a week when arming on battery. We cannot detect a bag; we can warn.
     case bagWarning
+    /// macOS changed since the last arm that verified, and this arm verified anyway. Said once,
+    /// because "it still works" is only worth interrupting for when the user has reason to doubt.
+    case recheckedAfterOSUpdate(from: String, to: String)
 }
 
 /// Everything the state machine wants the host to do that is not a system read or write.
@@ -128,6 +131,9 @@ public enum LidwingEffect: Equatable, Sendable {
     /// Hold off App Nap and sudden termination for the armed session.
     case beginActivity
     case endActivity
+    /// Persist the OS build on which an arm just verified. The host owns storage; the state
+    /// machine owns the decision about when the value has been earned.
+    case recordVerifiedOS(String)
     case uiNeedsRefresh
 }
 

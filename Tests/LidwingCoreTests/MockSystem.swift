@@ -182,7 +182,8 @@ enum TestFixture {
     }
 
     /// Builds a machine plus a state machine wired to fresh mocks.
-    static func harness(settings: SafetySettings = SafetySettings())
+    static func harness(settings: SafetySettings = SafetySettings(),
+                        identity: RuntimeIdentity = TestFixture.identity)
         -> (MockSystem, MockLedgerStore, MockAudit, MockWatchdog, StateMachine) {
         let system = healthyMachine()
         let ledger = MockLedgerStore()
