@@ -64,6 +64,12 @@ public final class StateMachine {
     /// Consumed the moment the lid driver reports, dropped if the machine turns out to have no
     /// lid at all. Not persisted: it is an intent about *this* launch.
     internal var deferredArmAtLaunch = false
+
+    /// True when this session was started by Lidwing itself at launch rather than by the user.
+    ///
+    /// It decides one thing: whether the idle-sleep assertion is held while the lid is open. See
+    /// `idleAssertionIsNeeded`.
+    internal var armedWithoutBeingAsked = false
     /// Last known lid position, so a chime fires on the transition and not on every one of the
     /// four non-lid events that also deliver a clamshell notification.
     internal var lidWasClosed = false
@@ -88,6 +94,37 @@ public final class StateMachine {
         self.settings = settings
         self.policy = SafetyPolicy(settings: settings)
         self.pid = pid
+    }
+
+    /// Whether the idle-sleep assertion should be held right now.
+    ///
+    /// Both halves of the mechanism are required and orthogonal - the clamshell mask stops the
+    /// *demand* sleep from a lid close, and this assertion stops the *idle* timer - but they are
+    /// not needed at the same moments, and that difference stopped being academic when Lidwing
+    /// began arming itself at launch.
+    ///
+    /// Holding it unconditionally means a Mac with Lidwing installed **never idle-sleeps again**,
+    /// from login until the duration lease expires, whether or not anything is happening. A user
+    /// who walks away with the lid open comes back to a hot laptop that never slept, for a
+    /// feature they were not using. That is a change nobody asked for by installing a lid app.
+    ///
+    /// So it is held whenever there is a reason:
+    ///
+    /// * **the lid is shut** - the case the product exists for, and the assertion is essential
+    ///   there because the clamshell mask alone leaves the idle timer running;
+    /// * **an agent is running** - a run must survive the user walking away with the lid open,
+    ///   which is the same promise in a different posture;
+    /// * **the user asked for this explicitly** - they turned it on themselves and are entitled
+    ///   to have it mean what it used to mean.
+    ///
+    /// The only case it is released is an automatic arm, lid open, nothing running - where the
+    /// promise is not in play and the cost is real. It is re-taken the moment any of those
+    /// changes, immediately on the clamshell notification and within five seconds by reconcile.
+    internal var idleAssertionIsNeeded: Bool {
+        guard state.isProtecting else { return false }
+        if !armedWithoutBeingAsked { return true }
+        if facade.lidState == .closed { return true }
+        return !facade.runningAgentBinaries.isEmpty
     }
 
     // MARK: Entry point

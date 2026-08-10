@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **295** |
+| Tests | **304** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -102,9 +102,14 @@ its own bookkeeping:
 | 52 | The diagnostics inventory drops what the app ignores | hiding the very lines that explain why the app said nothing | **4** |
 | 53 | An empty machine prints nothing instead of saying so | "nothing was held" and "the read failed" become the same output | **1** |
 | 54 | The irrelevant assertions stop being counted | a silent drop, so a reader cannot tell whether the classification lost something | **2** |
+| 55 | The idle assertion is dropped with the lid shut | the dangerous direction: the mask alone leaves the idle timer running, so the Mac sleeps on a closed lid | **3** |
+| 56 | Dropped while an agent is running | a run dies because the user walked away with the lid open | **2** |
+| 57 | A user-requested arm is downgraded like an automatic one | somebody who asked explicitly gets less than they asked for | **1** |
+| 58 | It never releases | the behaviour this decision exists to remove: a Mac that never idle-sleeps again | **4** |
+| 59 | Releasing the assertion also clears the clamshell mask | an unarmed Mac that still believes it is protected | **2** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54, 304 for 55-59).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

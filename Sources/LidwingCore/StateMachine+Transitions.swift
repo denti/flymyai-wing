@@ -202,9 +202,7 @@ extension StateMachine {
         if case .success = facade.setClamshellSleepDisabled(true) {
             session?.countReassert()
         }
-        if !facade.ourAssertionLive {
-            _ = facade.setIdleAssertion(true)
-        }
+        reconcileIdleAssertion()
         watchdog.send(.heartbeat(at: facade.now))
         // The defining moment of this product: the lid just shut and the Mac is still running.
         // The user cannot see anything, so say it out loud.
@@ -230,9 +228,7 @@ extension StateMachine {
             break
         }
 
-        if !facade.ourAssertionLive {
-            _ = facade.setIdleAssertion(true)
-        }
+        reconcileIdleAssertion()
 
         // Auto mode: the natural end of a session is the agent exiting.
         if mode == .auto, let gone = agentGoneSince,
@@ -271,6 +267,21 @@ extension StateMachine {
 
     /// One mismatch buys one immediate re-write. A second, `verifyDeadline` later, is a
     /// failure: something on this machine is undoing us and the user needs to know.
+    /// Brings the idle-sleep assertion into line with whether it is currently needed.
+    ///
+    /// Called from both the fast path (every reassert trigger - a lid movement, a charger event)
+    /// and the slow one (reconcile, every five seconds). Two independent paths on purpose: the
+    /// notification is best-effort and the timer is not, so the worst case for taking the
+    /// assertion after a lid close is five seconds - far inside any idle-sleep timeout.
+    func reconcileIdleAssertion() {
+        let needed = idleAssertionIsNeeded
+        if needed, !facade.ourAssertionLive {
+            _ = facade.setIdleAssertion(true)
+        } else if !needed, facade.ourAssertionLive {
+            _ = facade.setIdleAssertion(false)
+        }
+    }
+
     func checkGroundTruth() -> GroundTruthCheck {
         guard facade.clamshellCausesSleep == true else {
             if facade.clamshellCausesSleep == false {

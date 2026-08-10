@@ -8,7 +8,8 @@ import Foundation
 extension StateMachine {
 
     func onUserArm() -> [LidwingEffect] {
-        arm(prompt: .askNow)
+        armedWithoutBeingAsked = false
+        return arm(prompt: .askNow)
     }
 
     /// Arming because Lidwing just started, not because anybody clicked.
@@ -20,6 +21,7 @@ extension StateMachine {
     /// keep-awake tool on it.
     func onArmAtLaunch() -> [LidwingEffect] {
         guard state == .idle else { return [] }
+        armedWithoutBeingAsked = true
 
         // A desktop at launch and a laptop whose lid driver has not reported yet look identical:
         // no `AppleClamshellState` key, which is `.unknown`. That is deliberately not collapsed
