@@ -142,6 +142,8 @@ public enum Translations {
         "settings.duration": "Выключиться через",
         "settings.duration.detail": "Lidwing выключится сам через это время, даже если вы забудете.",
         "settings.duration.hours": "%1$lld ч",
+        "settings.floor.custom": "%1$lld%% (своё значение)",
+        "settings.duration.custom": "%1$lld ч (своё значение)",
         "settings.duration.none": "Без ограничения",
         "settings.thermal": "Выключиться, если Mac перегреется",
         "settings.thermal.detail": "Закрытая крышка мешает продуву. "

@@ -237,9 +237,29 @@ final class SettingsWindowController: NSWindowController {
     /// bool: the value can change while this window is closed.
     private func reload() {
         let settings = coordinator.machine.settings
-        floorPopUp.selectItem(at: floorChoices.firstIndex(of: settings.batteryFloorPercent) ?? 2)
-        let durationIndex = durationChoices.firstIndex { $0 == settings.maxDurationSeconds }
-        durationPopUp.selectItem(at: durationIndex ?? 3)
+
+        // A stored value that is not one of the offered choices must still be *shown*. Falling
+        // back to a default here would display a number the app is not using, and the next
+        // change the user made would silently overwrite their real setting with it.
+        if let index = floorChoices.firstIndex(of: settings.batteryFloorPercent) {
+            floorPopUp.selectItem(at: index)
+        } else {
+            let title = Strings.text("settings.floor.custom", "%1$lld%% (custom)",
+                                     Int64(settings.batteryFloorPercent))
+            if floorPopUp.item(withTitle: title) == nil { floorPopUp.addItem(withTitle: title) }
+            floorPopUp.selectItem(withTitle: title)
+        }
+
+        if let index = durationChoices.firstIndex(where: { $0 == settings.maxDurationSeconds }) {
+            durationPopUp.selectItem(at: index)
+        } else if let seconds = settings.maxDurationSeconds {
+            let title = Strings.text("settings.duration.custom", "%1$lld hours (custom)",
+                                     Int64(seconds / 3600))
+            if durationPopUp.item(withTitle: title) == nil {
+                durationPopUp.addItem(withTitle: title)
+            }
+            durationPopUp.selectItem(withTitle: title)
+        }
         modeControl.selectedSegment = coordinator.machine.mode == .auto ? 1 : 0
         thermalCheckbox.state = settings.thermalGuardEnabled ? .on : .off
         soundCheckbox.state = Preferences.shared.soundEnabled ? .on : .off
@@ -262,7 +282,12 @@ final class SettingsWindowController: NSWindowController {
     }
 
     @objc private func settingsChanged() {
-        var duration = durationChoices[max(0, durationPopUp.indexOfSelectedItem)]
+        // A custom entry appended by `reload` sits past the end of the fixed list; selecting
+        // it means "keep what is already stored" rather than reading past the array.
+        let durationIndex = durationPopUp.indexOfSelectedItem
+        var duration = durationIndex >= 0 && durationIndex < durationChoices.count
+            ? durationChoices[durationIndex]
+            : coordinator.machine.settings.maxDurationSeconds
 
         // "No limit" is the one choice that removes a safety net, so it is the one choice that
         // asks. Declining puts the control back rather than silently ignoring the click.
@@ -286,8 +311,13 @@ final class SettingsWindowController: NSWindowController {
             }
         }
 
+        let floorIndex = floorPopUp.indexOfSelectedItem
+        let floor = floorIndex >= 0 && floorIndex < floorChoices.count
+            ? floorChoices[floorIndex]
+            : coordinator.machine.settings.batteryFloorPercent
+
         coordinator.setSafetySettings(SafetySettings(
-            batteryFloorPercent: floorChoices[max(0, floorPopUp.indexOfSelectedItem)],
+            batteryFloorPercent: floor,
             maxDurationSeconds: duration,
             thermalGuardEnabled: thermalCheckbox.state == .on))
         Preferences.shared.soundEnabled = (soundCheckbox.state == .on)
