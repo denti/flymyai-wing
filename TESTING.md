@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **304** |
+| Tests | **309** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -107,9 +107,12 @@ its own bookkeeping:
 | 57 | A user-requested arm is downgraded like an automatic one | somebody who asked explicitly gets less than they asked for | **1** |
 | 58 | It never releases | the behaviour this decision exists to remove: a Mac that never idle-sleeps again | **4** |
 | 59 | Releasing the assertion also clears the clamshell mask | an unarmed Mac that still believes it is protected | **2** |
+| 60 | It never arms again after a disarm | "install it and it works" true exactly once: after the eight-hour lease, protection never returns on a Mac that stays logged in | **2** |
+| 61 | A wake arms against the user's preference | overruling somebody who switched the behaviour off | **2** |
+| 62 | The wake arm is allowed to prompt | a dialog on a path that by definition runs with nobody there | **1** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54, 304 for 55-59).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54, 304 for 55-59, 309 for 60-62).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

@@ -344,6 +344,20 @@ extension StateMachine {
             return reArmAfterFailure()
         case .armed, .degraded:
             return onReassertTrigger()
+        case .idle:
+            // A new working session, so the zero-step promise applies again.
+            //
+            // Without this, "install it and it works" was true exactly once. The default mode is
+            // manual, so nothing re-arms after a disarm - and the duration lease disarms after
+            // eight hours. On a Mac that stays logged in for days, Lidwing protected for one
+            // lease after login and then silently never again, with the user believing they had
+            // installed something that keeps working.
+            //
+            // A wake is the right boundary and the only one that cannot defeat the lease: it
+            // requires the machine to have actually slept, which is precisely the outcome the
+            // lease exists to force. Nothing here can extend a run indefinitely - to reach this
+            // point the run is already over.
+            return reArmAfterWakeIfWanted()
         default:
             return []
         }

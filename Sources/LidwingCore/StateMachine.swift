@@ -70,6 +70,10 @@ public final class StateMachine {
     /// It decides one thing: whether the idle-sleep assertion is held while the lid is open. See
     /// `idleAssertionIsNeeded`.
     internal var armedWithoutBeingAsked = false
+
+    /// Whether Lidwing turns itself on when there is a reason to - at launch, and again after a
+    /// wake. Set by the host from the preference of the same meaning; `true` is the product.
+    public var armsItselfWhenThereIsAReason = true
     /// Last known lid position, so a chime fires on the transition and not on every one of the
     /// four non-lid events that also deliver a clamshell notification.
     internal var lidWasClosed = false

@@ -130,4 +130,13 @@ extension StateMachine {
         }
         return effects
     }
+
+    /// Arms again after a wake, if that is what the user has asked for by leaving the
+    /// arm-at-launch preference on. Quietly, on the same terms as the launch arm: every refusal
+    /// still applies and none of them may interrupt.
+    func reArmAfterWakeIfWanted() -> [LidwingEffect] {
+        guard armsItselfWhenThereIsAReason else { return [] }
+        armedWithoutBeingAsked = true
+        return arm(prompt: .quietly)
+    }
 }

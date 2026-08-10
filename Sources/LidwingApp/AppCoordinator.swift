@@ -68,6 +68,7 @@ final class AppCoordinator {
         machine.mode = preferences.mode
         machine.hasEverArmed = preferences.hasEverArmed
         machine.lastVerifiedOS = preferences.lastVerifiedOS
+        machine.armsItselfWhenThereIsAReason = preferences.armAtLaunch
         // Logged here rather than from the state machine, which has no logger and should not
         // grow one. Same pure comparison, so there is only one rule about what counts as a
         // change - and it is recorded even if the user never arms again, because this is the

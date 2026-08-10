@@ -351,6 +351,95 @@ final class StateMachineTests: XCTestCase {
         XCTAssertTrue(effects.contains(.notify(.groundTruthLost)))
     }
 
+    // MARK: coming back after a disarm
+    //
+    // "Install it and it works" was true exactly once. The default mode is manual, so nothing
+    // re-armed after a disarm - and the duration lease disarms after eight hours. On a Mac that
+    // stays logged in for days, Lidwing protected for one lease after login and then silently
+    // never again, while the user believed they had installed something that keeps working.
+
+    /// A wake is a new working session, and the zero-step promise applies again.
+    func testItArmsAgainAfterTheMachineWakes() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        machine.handle(.verifyTick)
+        machine.handle(.userDisarm)
+        machine.handle(.verifyTick)
+        XCTAssertEqual(machine.state, .idle)
+
+        machine.handle(.systemHasPoweredOn)
+
+        XCTAssertEqual(machine.state, .arming, "protection never came back after a disarm")
+        XCTAssertEqual(system.lastClamshellWrite, true)
+    }
+
+    /// A wake cannot defeat the duration lease, because reaching it requires the machine to have
+    /// actually slept - which is the outcome the lease exists to force. The run is already over.
+    func testAWakeCannotExtendARunPastItsLease() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        machine.handle(.verifyTick)
+
+        system.advance(Double(machine.settings.maxDurationSeconds ?? 0) + 1)
+        machine.handle(.reconcileTick)
+        XCTAssertNotEqual(machine.state, .armed, "the lease did not expire")
+
+        // The new session that follows a sleep gets a fresh lease, not a continuation.
+        machine.handle(.verifyTick)
+        machine.handle(.systemHasPoweredOn)
+        if machine.state == .arming {
+            machine.handle(.verifyTick)
+            XCTAssertEqual(machine.session?.armedAt, system.now,
+                           "the new session inherited the old one's start time")
+        }
+    }
+
+    /// Somebody who turned the preference off is not overruled by a wake.
+    func testItDoesNotArmAfterAWakeWhenTheUserTurnedThatOff() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        machine.armsItselfWhenThereIsAReason = false
+        machine.handle(.launch)
+
+        machine.handle(.systemHasPoweredOn)
+
+        XCTAssertEqual(machine.state, .idle)
+        XCTAssertTrue(system.clamshellWrites.isEmpty, "armed itself against the user's preference")
+    }
+
+    /// Every refusal still applies on this path, and none of them may interrupt - it runs with
+    /// no user present by definition.
+    func testTheWakeArmStillRefusesQuietlyWhenItShould() {
+        let (system, _, _, _, machine) = TestFixture.harness()
+        system.batteryCurrent = 100
+        system.batteryMax = 5000          // below the floor
+        machine.handle(.launch)
+
+        let effects = machine.handle(.systemHasPoweredOn)
+
+        XCTAssertEqual(machine.state, .idle)
+        for effect in effects {
+            if case .refuseArm(_, let prompt) = effect {
+                XCTAssertEqual(prompt, .quietly, "a wake opened a dialog with nobody there")
+            }
+        }
+    }
+
+    /// Waking while already armed re-asserts rather than starting a second session.
+    func testAWakeWhileArmedDoesNotStartASecondSession() {
+        let (_, _, _, _, machine) = TestFixture.harness()
+        machine.handle(.launch)
+        machine.handle(.armAtLaunch)
+        machine.handle(.verifyTick)
+        let armedAt = machine.session?.armedAt
+
+        machine.handle(.systemHasPoweredOn)
+
+        XCTAssertEqual(machine.state, .armed)
+        XCTAssertEqual(machine.session?.armedAt, armedAt, "the session restarted on a wake")
+    }
+
     // MARK: the powerd stomp
     //
     // The known hole in this mechanism, and the one the 8-hour soak exists to measure: powerd
