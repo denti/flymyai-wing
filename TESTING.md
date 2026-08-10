@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **254** |
+| Tests | **272** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -83,13 +83,26 @@ its own bookkeeping:
 | 33 | It arms itself while the machine needs repair | writing on top of a bit somebody else set, instead of standing down | **1** |
 | 34 | Foreign holders ignored when deciding to arm | fighting another keep-awake tool for a global, reference-count-free bit | **6** |
 | 35 | It arms itself before knowing the Mac has a lid | a Mac mini held awake for the whole duration lease, for a feature it cannot use. Found by auditing my own change, not by a user | **7** |
+| 36 | System-owned assertions shown to the user | naming `powerd` and `WindowServer` holds a user can do nothing about | **1** |
+| 37 | Display and user-active holds treated as conflicts | a trackpad tickle reported as competing for a closed lid | **1** |
+| 38 | A self-releasing `caffeinate` promoted to the headline | the menu bar changing on its own every few minutes, forever, because Claude Code spawns one per command | **1** |
+| 39 | Internet Sharing named `configd` | a name that tells the user nothing, in place of the one that tells them what to switch off | **4** |
+| 40 | A non-releasing timeout counted as temporary | a hold that never hands the machine back, dismissed as transient | **1** |
+| 41 | Idle-sleep and system-sleep holds not distinguished | the one kind that actually does Lidwing's job, ranked equal with the ones that do not | **2** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist
 because the mock was corrected to model a guard the real machine has and the mock did not.
+
+Mutations 36 and 37 were **green on the first attempt**, and that is the finding rather than a
+footnote: the owner filter and the kind filter are redundant *for the real fixture*, because every
+system process in it happens to hold a display or user-active assertion. Each was masking the
+other, so deleting either changed nothing any test could see. Two cases now isolate them - a
+system process holding a system-sleep assertion, and an ordinary app holding a display one -
+which are the combinations the real machine did not happen to produce.
 
 Mutation 27 needed the code changed before it could be caught at all: the "somebody else changed
 it" guard and the "it already equals the original" guard are indistinguishable for a two-valued

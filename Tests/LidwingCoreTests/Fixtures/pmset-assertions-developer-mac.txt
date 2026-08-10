@@ -1,0 +1,19 @@
+Assertion status system-wide:
+   BackgroundTask                 1
+   ApplePushServiceTask           0
+   UserIsActive                   1
+   PreventUserIdleDisplaySleep    0
+   PreventSystemSleep             0
+   ExternalMedia                  0
+   PreventUserIdleSystemSleep     1
+   NetworkClientActive            0
+Listed by owning process:
+   pid 41846(Claude): [0x0000094600018f2a] 3:25:00 NoIdleSleepAssertion named: "Electron"
+   pid 47116(caffeinate): [0x0000094600018f31] 00:00:38 PreventUserIdleSystemSleep named: "caffeinate command-line tool"
+	Details: caffeinate asserting for 300 secs
+	Timeout will fire in 262 secs Action=TimeoutActionRelease
+   pid 366(configd): [0x0000094600001a04] 1:30:00 DenySystemSleep named: "InternetSharingPreferencePlugin"
+   pid 0(powerd): [0x0000094600000102] 0:00:00 PreventUserIdleDisplaySleep named: "Prevent sleep while display is on"
+   pid 0(powerd): [0x0000094600000103] 0:00:00 InternalPreventDisplaySleep named: "com.apple.powermanagement.lidopen"
+   pid 233(WindowServer): [0x0000094600000891] 0:00:12 UserIsActive named: "com.apple.iohideventsystem.queue.tickle serviceID:1000004d1 name:AppleMultitouchDevice product:Apple Internal Keyboard / Trackpad eventType:11"
+   pid 512(mds_stores): [0x00000946000104ab] 0:04:17 BackgroundTask named: "mds_stores backgroundtask"
