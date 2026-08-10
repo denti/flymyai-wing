@@ -114,6 +114,30 @@ engineering one.
 
 ---
 
+## H3a — Get a build, without publishing anything · 2 minutes
+
+Every green CI run uploads a signed `.dmg`. No GitHub Release is created and nothing about the
+product is public — the repository still has a one-line README, no description and no topics,
+exactly as agreed.
+
+```bash
+cd ~/lidwing-repo
+gh run download --name "Lidwing-$(git rev-parse HEAD)" --dir ~/Downloads/lidwing
+# or, for whatever the newest green run produced:
+gh run list --workflow=ci.yml --branch main --limit 5
+gh run download <run-id> --dir ~/Downloads/lidwing
+open ~/Downloads/lidwing/Lidwing-0.0.0.dmg
+```
+
+Drag Lidwing to Applications **in Finder**, not with `mv` — Finder clears the quarantine
+attribute and `mv` does not.
+
+**It is ad-hoc signed until the Developer Program enrolment lands (H4)**, so macOS will refuse
+the first launch and you will need the six-step System Settings dance in `INSTALL.md`. That is
+expected, and it is exactly why H4 matters: with a Developer ID this becomes a double-click.
+
+---
+
 ## H3b — Fault injection · 10 minutes · once the app is installed
 
 The unit tests cover the *logic* of dying mid-transition. This covers the *processes*.
@@ -180,6 +204,46 @@ binary release, and we wait. We do not ship a binary under a personal name by de
 3. Leave the repository description and topics **empty** until the release milestone.
 
 `gh api repos/denti/flymyai-wing/branches/main/protection` returning 200 is the check.
+
+---
+
+---
+
+## H6 — The performance numbers · 5 minutes · once the app is installed
+
+These are published claims, and right now every one of them is a budget rather than a
+measurement. `AUDIT.md` says so explicitly instead of quoting the budgets as if they were
+results.
+
+```bash
+cd ~/lidwing-repo
+# Lidwing running, menu closed, doing nothing:
+./Scripts/perf-gate.sh
+# and a longer one, for memory and file-descriptor growth:
+./Scripts/perf-gate.sh --soak 300
+```
+
+**Expected:** idle CPU at or below 0.1 %, idle wake-ups at or below 2/s, app memory under
+40 MB, watchdog under 8 MB, and no file descriptors accumulating over the soak.
+
+**Send:** the `SUMMARY` line and anything marked `FAIL`. If a number is over budget I would
+rather change the code than change the budget, so the raw figure is what matters.
+
+Also worth running once with Lidwing **off**, to confirm `pmset -g assertions | grep -i lidwing`
+returns nothing at all. That is the check a suspicious user runs, and it has to pass for them.
+
+---
+
+## H7 — The compatibility smoke test · 2 minutes per machine
+
+Read-only. It never writes a system setting, never asks for root and never arms anything.
+
+```bash
+ssh <mac> 'bash -s -- --app /Applications/Lidwing.app' < Scripts/lidwing-smoke.sh
+```
+
+**Expected:** `SUMMARY pass=… fail=0 skip=…`. The skips are the point — a lid cannot be closed
+by a script, and the script says so in every run rather than quietly omitting the line.
 
 ---
 
