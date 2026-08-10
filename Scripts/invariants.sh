@@ -25,7 +25,8 @@ check() {
 
 echo "== artifact invariants for $BUNDLE"
 
-test -x "$BINARY"; check $? "the executable exists and is executable"
+if [ -x "$BINARY" ]; then check 0 "the executable exists and is executable"
+else check 1 "the executable exists and is executable"; fi
 
 # A thinned binary ships to half the users and works for the other half, which is the worst
 # possible way to find out.
@@ -36,8 +37,8 @@ check $? "universal: both arm64 and x86_64 slices present"
 
 # Two load commands, one per slice.
 MINOS_COUNT="$(otool -l "$BINARY" | grep -c "minos $MIN" || true)"
-test "$MINOS_COUNT" -eq 2
-check $? "minos $MIN on both slices (found $MINOS_COUNT)"
+if [ "$MINOS_COUNT" -eq 2 ]; then check 0 "minos $MIN on both slices (found $MINOS_COUNT)"
+else check 1 "minos $MIN on both slices (found $MINOS_COUNT)"; fi
 
 # The one that produces a random-looking EXC_BAD_ACCESS on exactly the old OS versions a low
 # deployment target exists to reach.

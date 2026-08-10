@@ -162,7 +162,8 @@ done
 
 echo '{"session":"abc","message":"needs permission"}' | "$WORK/lidwing-notify" --claude
 STATUS=$?
-[ "$STATUS" -eq 0 ] && ok "exits 0 with a listener" || bad "exited $STATUS with a listener"
+if [ "$STATUS" -eq 0 ]; then ok "exits 0 with a listener"
+else bad "exited $STATUS with a listener"; fi
 
 wait "$LISTENER" 2>/dev/null
 LISTENER_STATUS=$?
@@ -193,7 +194,8 @@ if [ -s "$RECEIVED" ]; then
     bad "no trailing newline — the receiver would never frame the message"
   fi
   LINES="$(wc -l < "$RECEIVED" | tr -d ' ')"
-  [ "$LINES" -eq 1 ] && ok "exactly one line" || bad "expected one line, got $LINES"
+  if [ "$LINES" -eq 1 ]; then ok "exactly one line"
+  else bad "expected one line, got $LINES"; fi
 else
   bad "the listener received nothing (empty is a failure, not a pass)"
 fi
@@ -240,7 +242,8 @@ chmod +x "$WORK/incumbent.sh"
 
 "$WORK/lidwing-notify" '{"payload":"x"}' --codex --chain "$WORK/incumbent.sh" --its-own-arg
 STATUS=$?
-[ "$STATUS" -eq 0 ] && ok "exits 0 when chaining" || bad "exited $STATUS when chaining"
+if [ "$STATUS" -eq 0 ]; then ok "exits 0 when chaining"
+else bad "exited $STATUS when chaining"; fi
 
 if [ -f "$CHAIN_MARKER" ]; then
   ok "the displaced command actually ran: $(cat "$CHAIN_MARKER")"
@@ -251,14 +254,23 @@ fi
 # ------------------------------------------------------------------ hostile input
 
 BIG="$(head -c 20000 /dev/zero | tr '\0' 'x')"
-echo "$BIG" | "$WORK/lidwing-notify" --claude
-[ $? -eq 0 ] && ok "exits 0 on a 20 KB payload" || bad "a large payload changed the exit code"
+if echo "$BIG" | "$WORK/lidwing-notify" --claude; then
+  ok "exits 0 on a 20 KB payload"
+else
+  bad "a large payload changed the exit code"
+fi
 
-printf '\x00\x01\x02 binary \xff\xfe' | "$WORK/lidwing-notify" --claude
-[ $? -eq 0 ] && ok "exits 0 on binary input" || bad "binary input changed the exit code"
+if printf '\x00\x01\x02 binary \xff\xfe' | "$WORK/lidwing-notify" --claude; then
+  ok "exits 0 on binary input"
+else
+  bad "binary input changed the exit code"
+fi
 
-HOME="" "$WORK/lidwing-notify" --claude </dev/null
-[ $? -eq 0 ] && ok "exits 0 with no HOME set" || bad "an unset HOME changed the exit code"
+if HOME="" "$WORK/lidwing-notify" --claude </dev/null; then
+  ok "exits 0 with no HOME set"
+else
+  bad "an unset HOME changed the exit code"
+fi
 
 echo "SUMMARY pass=$PASS fail=$FAIL"
 exit "$FAIL"

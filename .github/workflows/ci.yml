@@ -60,6 +60,19 @@ jobs:
           name: linux-test-log
           path: linux-test.log
 
+  # The shell scripts run on a user's Mac, where nobody can debug them. macOS ships bash 3.2.
+  shellcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - name: ShellCheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --version
+          shellcheck -S warning Scripts/*.sh spike/*.sh
+
   # LidwingCore must stay portable: the moment it imports AppKit or IOKit, the whole
   # Linux-testable architecture is gone and nobody notices until the next Linux build breaks.
   core-purity:

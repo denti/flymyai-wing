@@ -17,7 +17,6 @@ set -u -o pipefail
 
 APP="${1:-/Applications/Lidwing.app}"
 BINARY="$APP/Contents/MacOS/Lidwing"
-WATCHDOG="$APP/Contents/Resources/lidwingd"
 SUPPORT="$HOME/Library/Application Support/Lidwing"
 PASS=0
 FAIL=0
@@ -59,6 +58,7 @@ kill_everything() {
   sleep 1
 }
 
+# shellcheck disable=SC2329  # invoked by the EXIT/INT/TERM trap below
 restore() {
   note "TRAP: restoring"
   kill_everything

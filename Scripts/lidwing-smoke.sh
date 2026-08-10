@@ -21,7 +21,6 @@ set -u -o pipefail
 
 APP=""
 MIN_OS="12.0"
-BUNDLE_ID="ai.flymy.lidwing"
 WATCHDOG_LABEL="ai.flymy.lidwing.watchdog"
 PASS=0; FAIL=0; SKIP=0
 

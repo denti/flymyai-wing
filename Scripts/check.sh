@@ -27,6 +27,13 @@ else
   echo "== workflows (skipped: actionlint not installed — see Scripts/README.md)"
 fi
 
+# The shell scripts are a large part of this product and they run on Denis's machine, where I
+# cannot debug them. macOS ships bash 3.2, this box has 5.x, and the difference is exactly the
+# kind of thing that only shows up in front of the person who can least afford it.
+echo "== shell scripts"
+docker run --rm -v "$PWD":/mnt koalaman/shellcheck:stable -S warning \
+  Scripts/*.sh spike/*.sh || FAIL=1
+
 echo "== core purity"
 ./Scripts/check-core-purity.sh || FAIL=1
 
