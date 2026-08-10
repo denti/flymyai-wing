@@ -46,8 +46,10 @@ if [ "$COUNT" -lt 40 ]; then
 fi
 
 echo "== notify helper"
-docker run --rm -v "$PWD":/src -w /src -u "$(id -u):$(id -g)" -e HOME=/tmp "$DOCKER_SWIFT" \
-  ./Scripts/test-notify-helper.sh | tail -1 || FAIL=1
+# `timeout`, because these tests talk to sockets and a wedged one would hang this gate the way
+# it once hung a CI job. A hang is not a pass.
+timeout 120 docker run --rm -v "$PWD":/src -w /src -u "$(id -u):$(id -g)" -e HOME=/tmp \
+  "$DOCKER_SWIFT" ./Scripts/test-notify-helper.sh | tail -1 || FAIL=1
 
 echo "== lint (strict)"
 docker run --rm -v "$PWD":/work -w /work "$DOCKER_LINT" swiftlint lint --strict --reporter emoji \
