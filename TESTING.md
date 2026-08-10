@@ -16,15 +16,16 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **162** |
+| Tests | **168** |
 | Failures | 0 |
 | Wall clock | 0.83 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
 
 Breakdown: StateMachine 40 · ClaudeSettingsPatch and CodexConfigPatch 23 · SafetyPolicy 17 ·
-WatchdogPolicy 13 · Ledger and AuditRecord 13 · Strings and Translations 12 · MenuPresenter 9 ·
-LogEvent 8 · Uninstall 8 · FirstRunCopy 6 · Version 5 · WingGeometry 5. `LidwingSystemTests`
-adds 20 more on macOS only (§2).
+WatchdogPolicy 13 · Ledger and AuditRecord 13 · MenuPresenter 12 · Strings and Translations 12 ·
+Uninstall 11 · LogEvent 8 · FirstRunCopy 6 · Version 5 · WingGeometry 5. `LidwingSystemTests`
+adds 20 more on macOS only (§2), and `Scripts/test-notify-helper.sh` 15 more against the
+compiled binary (§3).
 
 ### Positive control — observed, not asserted
 
@@ -55,7 +56,7 @@ its own bookkeeping:
 | 6 | `CodexConfigPatch.install` writes our command without chaining | silently taking away a feature the user already had | **2** |
 | 7 | Repair calls `setClamshellSleepDisabled(false)` instead of `repairClamshellState()` | the original defect from audit round 3: the button reports success and changes nothing | **3** |
 
-Each was applied, measured, and reverted; the suite returned to **162 passed, 0 failed** after
+Each was applied, measured, and reverted; the suite returned to **168 passed, 0 failed** after
 every one.
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
@@ -224,7 +225,22 @@ Named so that their absence is visible rather than implied:
 
 ---
 
-## 8. Failures this regime has already caught
+## 8. The rule this regime keeps re-learning
+
+**A test that passes against the bug it was written for is not a test.**
+
+It has now happened twice in different forms. The notify-helper test passed against both the
+broken and the fixed implementation until the race was made deterministic. The Repair test
+passed against a button that did nothing, because the mock was more permissive than the
+machine. In both cases the suite was green, the count went up, and the evidence was worth
+nothing.
+
+The habit that catches it: after writing a test, break the thing it covers and watch it go red.
+Every mutation in §1 and the two controls in §3 exist because that habit found something.
+
+---
+
+## 9. Failures this regime has already caught
 
 Recorded because a test regime's value is what it stopped, not what it asserts.
 
