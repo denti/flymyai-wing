@@ -114,6 +114,11 @@ jobs:
       # its own total. Numbers in a document are checked by nothing unless something checks them.
       - name: The numbers in the docs match the repository
         run: ./Scripts/check-documented-numbers.sh
+      # The M0 verdict decides the architecture, runs twice ever, on somebody else's machine.
+      # Its arithmetic is tested here against inputs nobody wants to stage on real hardware -
+      # including a run in which the lid was never closed.
+      - name: The M0 verdict logic
+        run: ./Scripts/test-m0-verdict.sh
 
   test-macos:
     runs-on: macos-15

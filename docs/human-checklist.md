@@ -73,9 +73,18 @@ window, no wake animation), and the terminal ends with:
 ```
 verdict:        PASS
 max_gap_s:      1
+gap_samples:    120
+lid_closed:     100%   (24 of 24 samples, 5s apart)
 sleep_delta:    0
 darkwake_delta: 0
 ```
+
+`lid_closed` is new and it is the line to look at first. The script now samples
+`AppleClamshellState` every five seconds and **fails the run if the lid was shut for less than
+80% of it**. Until this was added, a run where the lid was never closed reported a confident
+PASS - the Mac stays awake for the most ordinary reason there is, every counter reads clean, and
+the verdict proved nothing. If you get `lid_closed: 0%`, the answer is not that the mechanism
+failed; it is that the experiment did not happen, and it needs running again.
 
 **Expected if it does not:** you get the login window, and `verdict: FAIL` with `max_gap_s`
 close to 120.

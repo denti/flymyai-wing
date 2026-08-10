@@ -52,7 +52,9 @@ Nothing is red.
 ## BLOCKERS
 
 - **M0** — the lid experiment. `docs/human-checklist.md` H1–H3. Nothing else can substitute:
-  no rentable Mac on Earth has a hinge.
+  no rentable Mac on Earth has a hinge. The harness now refuses to report PASS unless the lid
+  was actually shut for most of the run, and its verdict arithmetic is tested by
+  `Scripts/test-m0-verdict.sh` against sixteen cases including that one.
 - **T5, partially open** — USPTO search for "Lidwing". Every other registry is clear. Blocks
   the first published build, not development.
 - **Low Power Mode cannot be written without root** — and it is a Denis override, default ON
@@ -114,10 +116,11 @@ Nothing is idling on any of these.
 | [0008](docs/decisions/0008-when-lidwing-makes-a-sound.md) | Chime on arm vs on lid close | Lid close, and standing down with the lid shut |
 | [0009](docs/decisions/0009-localisation-scope.md) | Eight languages vs what can be checked | English and Russian, complete and tested; diagnostics stay English on purpose |
 
-## Audit — nine rounds, all findings fixed
+## Audit — ten rounds, all findings fixed
 
 | Round | Method | Worst finding |
 |---|---|---|
+| 10 (the M0 script) | Ask of the most consequential script: can this report success without proving anything? | **A PASS did not require the lid to have been closed.** Nothing sampled `AppleClamshellState`. A lid left open gives a Mac that stays awake for the most ordinary reason there is, clean counters, and a confident PASS - and the architecture would have rested on an experiment in which the thing under test never happened. |
 | 9 (read as an attacker, then a red build) | Assume a hostile same-uid process and a shared Mac; then read the CI that failed | **A compile failure reported as a passing step**, because `swift test \| tee log` runs under `bash -e` with no `pipefail` and `tee` decides the exit code. The `macos-26` canary had the same shape in both its steps, so the job whose entire purpose is to go red before a user does was structurally incapable of reporting a failing test. Every green canary before this commit proved only that the runner started. |
 | 8 (the spec beside the code) | Read `CRAFT.md` §8 and all fifty antipatterns in §11 against the implementation | **Three of the five Settings controls had no help text at all.** The tooltip and the spoken explanation were attached behind `as? NSButton`; a segmented control and two pop-ups are not buttons, and one call site handed the cast a stack view, which could never match. The two silent rows were the battery floor and the duration limit - the two settings that decide when this Mac is allowed to stop. The two checkboxes worked, which is why it looked fine. |
 | 7 (CI behaving oddly) | A macOS job stopped making progress | **A test that hung instead of failing.** `sun_path` is 104 bytes on macOS and 108 on Linux; the test's socket path fitted only the larger. The listener's `strncpy` truncated and bound elsewhere, `lidwing-notify` correctly refused the over-long path, and `accept()` waited forever. Everything that waits now has a deadline. |

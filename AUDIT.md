@@ -578,6 +578,35 @@ Fixed: a short path, an asserted path length, and `XCTUnwrap` instead of `XCTSki
 no `XCTSkip` anywhere in the suite, and CI fails on any reported skip, so putting one back has
 to be a deliberate decision somebody defends.
 
+---
+
+## Round 10 — 2026-08-10, the script that decides the architecture
+
+Scope: `spike/m0-run.sh`. Method: the lens the last two rounds sharpened - where can this report
+success without having proved anything? - pointed at the one script whose result the entire
+product rests on, and which is about to be run on a real Mac.
+
+### Findings, fixed
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 10.1 | **A PASS did not require the lid to have been closed.** The script printed `>>> CLOSE THE LID NOW <<<`, measured for two minutes, and computed its verdict. Nothing anywhere sampled `AppleClamshellState`. If the lid stayed open - forgotten, interrupted, or shut for ten seconds of the window - the Mac stays awake for the most ordinary reason there is, the heartbeat is perfect, both kernel counters are unmoved, and the verdict is a confident PASS. The entire architecture would then rest on an experiment in which the thing being tested never happened. | **Critical** | The lid is sampled every 5 s into `lid.log` and into every heartbeat line, and the verdict fails below 80% closed, or on fewer than two samples. `lid_closed:` is now the first line of the verdict a reader should check, and `docs/human-checklist.md` H2 says so. |
+| 10.2 | **A gap of zero measured from zero samples read as a flawless run.** `max_gap_of` ends in `print max + 0`, so a heartbeat log that is empty or unparseable yields `max_gap_s: 0` - indistinguishable from perfection, and the most reassuring number in the file. | High | The verdict now records how many samples the gap came from and fails below two. The script's own comment already said "a gap measured from two samples is not a measurement"; it just did not act on it. |
+| 10.3 | **The verdict logic had never been executed.** It runs once or twice ever, on a machine nobody can debug, and until now no test had run it at all - including the branches that matter most, which are the ones nobody wants to stage on real hardware. | High | `Scripts/test-m0-verdict.sh` extracts the block verbatim from the shipped script and runs it against sixteen synthetic cases: a Mac that slept, a dark wake, unreadable counters, a lid never closed, a lid closed for 79% and for 80%, a gap from no samples. In the gate and in CI. |
+
+Five positive controls on 10.3, each proven red by disabling a guard in the real script. One of
+them came back **green**: the "lid was never sampled" case was being caught by the *percentage*
+guard rather than the sample guard, so deleting the sample guard changed nothing the test could
+see. `expect` now asserts on the reason text as well as the verdict, which is what makes each
+case test its own guard rather than the union of all of them.
+
+**Round 10 verdict:** three defects in one 324-line script, one of them critical, in the
+component with the least code and the most riding on it. It had been reviewed twice before, for
+correctness - which it had. The question that found these was not "is this right" but "can this
+report success without proving anything", and that is a different question.
+
+---
+
 **Round 9 verdict:** eight defects, none capable of stranding a Mac, three of them about other
 accounts on a shared Mac rather than about the same-uid attacker this product cannot defend
 against and does not claim to. The fourth was a document quietly claiming things that were not

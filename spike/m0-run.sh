@@ -142,15 +142,44 @@ trap teardown EXIT INT TERM
 
 HEARTBEAT="$OUT/heartbeat.log"
 : > "$HEARTBEAT"
+
+# `AppleClamshellState` is Yes while the lid is shut. It is sampled into every heartbeat line
+# for one reason: **nothing else in this script knew whether the lid was ever closed.**
+#
+# The run printed "CLOSE THE LID NOW", measured for two minutes, and declared PASS. If the lid
+# stayed open - forgotten, interrupted, closed for ten seconds of a two-minute window - the Mac
+# stays awake for the most ordinary reason there is, every counter reads clean, and the verdict
+# is a confident PASS that proves nothing at all. The entire architecture would then rest on an
+# experiment in which the thing being tested never happened.
+lid_closed_now() {
+  ioreg -r -c IOPMrootDomain -d 1 2>/dev/null \
+    | awk -F'= ' '/"AppleClamshellState"/ {gsub(/[^A-Za-z]/,"",$2); print $2; exit}'
+}
+
 (
   while :; do
-    printf '%s uptime=%s load=%s\n' "$(date -u +%FT%TZ)" \
+    printf '%s uptime=%s load=%s lid=%s\n' "$(date -u +%FT%TZ)" \
       "$(uptime | sed 's/.*up //;s/,.*users.*//')" \
-      "$(sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1}')" >> "$HEARTBEAT"
+      "$(sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1}')" \
+      "$(lid_closed_now)" >> "$HEARTBEAT"
     sleep 60
   done
 ) &
 HEARTBEAT_PID=$!
+
+# A second, faster sampler purely for the lid. The 60-second heartbeat gives two samples on a
+# short run, and "was the lid closed" deserves better resolution than the thing it is
+# qualifying - a lid closed for 30 s of a 120 s run must not read the same as one closed
+# throughout.
+LIDLOG="$OUT/lid.log"
+: > "$LIDLOG"
+(
+  while :; do
+    printf '%s %s\n' "$(date -u +%FT%TZ)" "$(lid_closed_now)" >> "$LIDLOG"
+    sleep 5
+  done
+) &
+LID_PID=$!
 
 # ---------------------------------------------------------------- a real workload
 #
@@ -163,7 +192,7 @@ HEARTBEAT_PID=$!
 LOAD_PID=$!
 
 cleanup_children() {
-  kill "$HEARTBEAT_PID" "$LOAD_PID" 2>/dev/null || true
+  kill "$HEARTBEAT_PID" "$LOAD_PID" ${LID_PID:+"$LID_PID"} 2>/dev/null || true
 }
 trap 'cleanup_children; teardown' EXIT INT TERM
 
@@ -245,17 +274,33 @@ max_gap_of() {
 # Prefer wingprobe's own one-second log: on a two-minute run the sixty-second heartbeat has
 # only two samples, and a gap measured from two samples is not a measurement.
 if [ -s "$OUT/probe-heartbeat.log" ]; then
-  MAX_GAP="$(max_gap_of "$OUT/probe-heartbeat.log")"
+  GAP_FILE="$OUT/probe-heartbeat.log"
+  MAX_GAP="$(max_gap_of "$GAP_FILE")"
   GAP_SOURCE="wingprobe 1s heartbeat"
   GAP_BUDGET=5
 else
-  MAX_GAP="$(max_gap_of "$HEARTBEAT")"
+  GAP_FILE="$HEARTBEAT"
+  MAX_GAP="$(max_gap_of "$GAP_FILE")"
   GAP_SOURCE="shell 60s heartbeat"
   GAP_BUDGET=90
 fi
 
 TICKS="$(grep -c . "$HEARTBEAT" || echo 0)"
 EXPECTED_TICKS=$(( DURATION / 60 ))
+
+# How many samples the gap was actually measured from. `max_gap_of` prints `max + 0`, so a log
+# with nothing parseable in it yields a gap of 0 - which is indistinguishable from a flawless
+# run. A maximum over zero samples is not a small maximum; it is not a measurement.
+GAP_SAMPLES="$(grep -c . "$GAP_FILE" 2>/dev/null || echo 0)"
+
+# The lid. Sampled every 5 s into lid.log; `Yes` means shut.
+LID_SAMPLES="$(grep -c . "$LIDLOG" 2>/dev/null || echo 0)"
+LID_CLOSED="$(grep -c 'Yes$' "$LIDLOG" 2>/dev/null || echo 0)"
+if [ "$LID_SAMPLES" -gt 0 ]; then
+  LID_CLOSED_PCT=$(( LID_CLOSED * 100 / LID_SAMPLES ))
+else
+  LID_CLOSED_PCT=0
+fi
 
 SLEEP_DELTA="?"
 DARK_DELTA="?"
@@ -291,6 +336,23 @@ fi
 if [ "$TICKS" -lt $(( EXPECTED_TICKS - 1 )) ]; then
   VERDICT=FAIL; REASONS="$REASONS only $TICKS of ~$EXPECTED_TICKS heartbeats;"
 fi
+
+# The question this experiment exists to answer is whether a **closed** Mac stays awake. A run
+# in which the lid was not shut answers a different and far easier question, and answers it
+# with a confident PASS.
+if [ "$LID_SAMPLES" -lt 2 ]; then
+  VERDICT=FAIL; REASONS="$REASONS the lid was never sampled ($LID_SAMPLES samples);"
+elif [ "$LID_CLOSED_PCT" -lt 80 ]; then
+  VERDICT=FAIL
+  REASONS="$REASONS the lid was shut for only ${LID_CLOSED_PCT}% of the run"
+  REASONS="$REASONS ($LID_CLOSED of $LID_SAMPLES samples) - this did not test a closed lid;"
+fi
+
+# A gap of zero measured from nothing is not a pass.
+if [ "$GAP_SAMPLES" -lt 2 ]; then
+  VERDICT=FAIL
+  REASONS="$REASONS the gap came from $GAP_SAMPLES samples, which is not a measurement;"
+fi
 [ "$VERDICT" = PASS ] && REASONS=" none"
 
 {
@@ -299,6 +361,8 @@ fi
   echo "duration_s:     $DURATION"
   echo "max_gap_s:      ${MAX_GAP:-?}   (from $GAP_SOURCE, budget ${GAP_BUDGET}s)"
   echo "heartbeats:     $TICKS of ~$EXPECTED_TICKS expected"
+  echo "gap_samples:    $GAP_SAMPLES   (a maximum over fewer than 2 is not a measurement)"
+  echo "lid_closed:     ${LID_CLOSED_PCT}%   ($LID_CLOSED of $LID_SAMPLES samples, 5s apart)"
   echo "sleep_delta:    $SLEEP_DELTA"
   echo "darkwake_delta: $DARK_DELTA"
   echo "probe_exit:     $PROBE_STATUS"
