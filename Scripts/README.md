@@ -8,6 +8,9 @@
 | `sign.sh` | Inside-out signing. Takes a Developer ID identity, or `-` for ad-hoc. | macOS |
 | `notarize.sh` | `notarytool submit --wait` then `stapler`. Needs an App Store Connect API key. | macOS |
 | `package.sh` | `.dmg` and `.zip`, plus `SHA256SUMS.txt`. | macOS |
+| `lidwing-smoke.sh` | Read-only compatibility and safety smoke test for any Mac in the matrix. SKIP is never PASS. | macOS, over ssh |
+| `fault-injection.sh` | SIGKILL while armed, corrupt ledger, watchdog killed. Needs a real Mac and two Returns. | macOS |
+| `perf-gate.sh` | Idle CPU, idle wake-ups, memory, descriptor growth, assertion hygiene. These are gates, not goals. | macOS |
 | `invariants.sh` | Assertions about the built artifact: universal, `minos`, hardened, no usage descriptions, no network entitlement. | macOS |
 | `icon/main.swift` | Renders the app icon from the same wing geometry the menu bar uses. | macOS |
 
