@@ -74,10 +74,25 @@ extension StateMachine {
             return [.refuseArm(refusal, prompt)]
         }
 
-        // The dead-man goes up first. We never hold the mechanism without one.
-        guard watchdog.connect() else {
+        // The dead-man goes up first, and if it will not come up Lidwing works anyway.
+        //
+        // This used to refuse. On a real Mac that meant the product did nothing at all, ever:
+        // `SMAppService.agent` cannot register an ad-hoc signed app, so no watchdog existed and
+        // every arm was refused with "could not start its safety watchdog". Gating the feature
+        // on a component whose only job is cleanup after a failure is backwards - the fallback
+        // has to degrade, not refuse.
+        //
+        // What is actually risked by arming without one: the app dies while armed and the Mac
+        // cannot sleep on lid close **until the next restart**. Bounded, because
+        // `clamshellSleepDisableMask` is initialised to 0 in `IOPMrootDomain::start()` - a
+        // reboot always clears it, which `DESIGN.md` §2 calls the whole argument for this tier.
+        // Weighed against a product that never works, that is the better failure.
+        //
+        // It is recorded either way, so a session without a dead-man is visible in the audit
+        // rather than indistinguishable from a protected one.
+        let hasDeadMan = watchdog.connect()
+        if !hasDeadMan {
             audit.note(.watchdogUnavailable, at: facade.now, context: [:])
-            return [.refuseArm(.watchdogUnavailable, prompt)]
         }
 
         // The ledger is written before the first mutation so a panic between them is

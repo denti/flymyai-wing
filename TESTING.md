@@ -16,7 +16,7 @@ Last updated: 2026-08-10, at commit `286e0b5` plus the working tree of the same 
 | | |
 |---|---|
 | Command | `docker run --rm -v $PWD:/src -w /src swift:6.0 swift test` |
-| Tests | **310** |
+| Tests | **312** |
 | Failures | 0 |
 | Wall clock | 1.3 s |
 | Also runs | macOS 15 and macOS 26 in CI, same suite, same count |
@@ -111,9 +111,11 @@ its own bookkeeping:
 | 61 | A wake arms against the user's preference | overruling somebody who switched the behaviour off | **2** |
 | 62 | The wake arm is allowed to prompt | a dialog on a path that by definition runs with nobody there | **1** |
 | 63 | The conflict line promises the Mac will not sleep | the shipped lie: a user read it with Internet Sharing running and then watched the Mac sleep the moment he closed the lid | **3** |
+| 64 | Refusing to arm with no watchdog | the defect that made the product do nothing at all on any ad-hoc build: `SMAppService` cannot register an unsigned app, so every arm was refused | **4** |
+| 65 | A session with no dead-man is not recorded | it becomes indistinguishable from a protected one, and the audit cannot explain a Mac left awake | **1** |
 
 Each was applied, measured, and reverted; the suite returned to **0 failed** after every one
-(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54, 304 for 55-59, 309 for 60-62, 310 for 63).
+(168 tests when mutations 1-7 were run, 203 for 8-19, 211 for 20-23, 232 for 24-27, 244 for 28-31, 251 for 32-34, 254 for 35, 272 for 36-41, 278 for 42-44, 291 for 45-51, 295 for 52-54, 304 for 55-59, 309 for 60-62, 310 for 63, 312 for 64-65).
 
 Mutation 7 is the one that matters most, because it is not hypothetical: it **was** the shipped
 code until audit round 3, and the suite passed with it. The tests that catch it now exist

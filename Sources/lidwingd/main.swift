@@ -291,6 +291,22 @@ func log(_ message: String) {
 // MARK: - Main
 
 SupportDirectory.ensure()
+// Exactly one watchdog, and the first one wins.
+//
+// This matters now that the app spawns `lidwingd` as a plain child rather than registering a
+// launchd agent - launchd guaranteed a single copy and nothing else does. `UnixSocket.listen`
+// unlinks the socket path before binding, so a second instance would quietly steal the socket
+// from the first and leave an orphan watching nothing. The app can call for a watchdog more than
+// once in a session, so this is reachable rather than theoretical.
+//
+// A failure to create the lock file is deliberately not fatal: no dead-man at all is worse than
+// a small risk of two.
+let lockPath = SupportDirectory.file("lidwingd.lock").path
+let lockDescriptor = open(lockPath, O_CREAT | O_RDWR, 0o600)
+if lockDescriptor >= 0, flock(lockDescriptor, LOCK_EX | LOCK_NB) != 0 {
+    log("another watchdog already holds the lock; leaving it to run")
+    exit(0)
+}
 
 let watchdog = Watchdog()
 watchdog.reconcileAtStartup()

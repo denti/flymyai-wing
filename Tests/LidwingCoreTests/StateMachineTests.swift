@@ -48,16 +48,49 @@ final class StateMachineTests: XCTestCase {
         XCTAssertFalse(watchdog.isConnected)
     }
 
-    func testArmIsRefusedWithoutADeadMan() {
-        let (system, ledger, _, watchdog, machine) = TestFixture.harness()
+    /// **The regression test for the defect that made the product do nothing at all.**
+    ///
+    /// This used to assert a refusal, and on a real Mac that meant Lidwing never worked once:
+    /// `SMAppService.agent` cannot register an ad-hoc signed app with no Team ID, so no watchdog
+    /// existed, and every arm was refused with "could not start its safety watchdog". Gating the
+    /// feature on a component whose only job is cleanup after a failure is backwards.
+    ///
+    /// What is risked by arming without one is bounded: if the app then dies, the Mac cannot
+    /// sleep on lid close until the next restart - and `clamshellSleepDisableMask` is initialised
+    /// to 0 in `IOPMrootDomain::start()`, so a reboot always clears it.
+    func testItStillArmsWhenNoDeadManCanBeEstablished() {
+        let (system, ledger, audit, watchdog, machine) = TestFixture.harness()
         watchdog.canConnect = false
 
         let effects = machine.handle(.userArm)
 
-        XCTAssertEqual(effects, [.refuseArm(.watchdogUnavailable, .askNow)])
-        XCTAssertEqual(machine.state, .idle)
-        XCTAssertTrue(system.clamshellWrites.isEmpty, "we never touch the machine without a dead-man")
-        XCTAssertNil(ledger.currentLedger)
+        XCTAssertEqual(machine.state, .arming, "the product refused to work with no watchdog")
+        XCTAssertFalse(effects.contains { if case .refuseArm = $0 { return true } else { return false } })
+        XCTAssertEqual(system.lastClamshellWrite, true)
+        XCTAssertNotNil(ledger.currentLedger, "armed without recording durable intent")
+    }
+
+    /// ...and it is never silent about it. A session with no dead-man must be distinguishable in
+    /// the audit from a protected one, or the record cannot explain a Mac left awake.
+    func testArmingWithNoDeadManIsRecorded() {
+        let (_, _, audit, watchdog, machine) = TestFixture.harness()
+        watchdog.canConnect = false
+
+        machine.handle(.userArm)
+
+        XCTAssertTrue(audit.contains(.watchdogUnavailable),
+                      "a session with no dead-man looks exactly like a protected one")
+    }
+
+    /// The dead-man is still preferred and still used whenever it exists.
+    func testItStillUsesTheDeadManWhenThereIsOne() {
+        let (_, _, _, watchdog, machine) = TestFixture.harness()
+
+        machine.handle(.userArm)
+        machine.handle(.verifyTick)
+
+        XCTAssertTrue(watchdog.isConnected)
+        XCTAssertEqual(watchdog.sent.first, .armed(bootSession: "BOOT-0000", pid: 4412))
     }
 
     func testLedgerIsWrittenBeforeTheFirstMutation() {

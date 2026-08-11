@@ -76,7 +76,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   claim that used to sit here was false, and it was false in the way that matters: it was
   checkable, and nothing checked it. Both failures were the test's own socket path exceeding
   `sun_path` on a CI runner, not a product defect - but that is luck, not diligence.
-- **310 unit tests, 0 failures**, 1.1 s on Linux; the same suite plus 33 macOS-only tests in CI.
+- **312 unit tests, 0 failures**, 0.9 s on Linux; the same suite plus 33 macOS-only tests in CI.
 - **`shellcheck -S warning` clean** over every script, in the gate and in CI. The scripts run on
   a Mac I cannot debug, and macOS ships bash 3.2 where this box has 5.x.
 - **The hook helper is measured, not assumed**: 15 behavioural assertions against the compiled
@@ -89,7 +89,7 @@ ASSUMED means it follows from reading, not from running. BROKEN means it is red 
   universal (`x86_64 arm64`), `minos 12.0` on both slices, hard-linked concurrency runtime,
   signature verifies deep and strict, `LSUIElement`, a ten-digit build number, **zero**
   `UsageDescription` keys and **zero** entitlements of any kind.
-- **The suite has been proven able to fail, sixty-three ways**, and every gate in the
+- **The suite has been proven able to fail, sixty-five ways**, and every gate in the
   repository has now been watched failing at least once except one, which is named as unproven
   in `TESTING.md` rather than listed beside the others. Deliberate mutations produced
   21, 14, 13, 9, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1

@@ -73,6 +73,46 @@ enum WatchdogInstaller {
         let reason: String
     }
 
+    /// Starts `lidwingd` as a plain child process.
+    ///
+    /// This is the route that actually works, and it is a simplification rather than a
+    /// workaround. `SMAppService.agent` registration fails on an ad-hoc signed build with no
+    /// Team ID - on a real Mac, `launchctl print gui/501/ai.flymy.lidwing.watchdog` answered
+    /// "Could not find service in domain", no agent was ever registered, and every arm was
+    /// refused with "could not start its safety watchdog". A product that cannot work at all
+    /// until an Apple Developer Program enrolment completes is not a product.
+    ///
+    /// A child process needs no registration, no code-signing identity and no Login Items
+    /// approval. It works on an ad-hoc build and on every macOS from the deployment floor up.
+    /// The dead-man design is unchanged and unaffected: the app is the *client* on the control
+    /// socket, so any death - crash, `kill -9`, force quit - closes the socket and the watchdog
+    /// sees EOF in milliseconds. That is what covers the real risk.
+    ///
+    /// What launchd was for was boot-time recovery, and that guards a state which cannot exist:
+    /// `clamshellSleepDisableMask` is initialised to 0 in `IOPMrootDomain::start()`, so a reboot
+    /// always clears the bit. `DESIGN.md` §2 calls that asymmetry "the whole argument" for this
+    /// tier. A restorer that runs at boot is guarding against something a boot already fixed.
+    static func spawnAsChild() -> InstallOutcome {
+        guard let executable = watchdogExecutableURL() else {
+            return InstallOutcome(ok: false, route: "none",
+                                  reason: "lidwingd is not in the bundle")
+        }
+        let task = Process()
+        task.executableURL = executable
+        // No pipes: the control socket is the channel, and a pipe nobody drains would fill and
+        // block the watchdog at exactly the wrong moment.
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        task.standardInput = FileHandle.nullDevice
+        do {
+            try task.run()
+            return InstallOutcome(ok: true, route: "child", reason: "")
+        } catch {
+            return InstallOutcome(ok: false, route: "none",
+                                  reason: "could not start lidwingd: \(error.localizedDescription)")
+        }
+    }
+
     /// The same thing, but it says which route was taken and why the others were not.
     ///
     /// A user's Mac had no LaunchAgent, no `lidwingd`, and every arm refused - and there was no
