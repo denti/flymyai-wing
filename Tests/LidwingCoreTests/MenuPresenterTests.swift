@@ -67,8 +67,7 @@ final class MenuPresenterTests: XCTestCase {
         // Stated in the detail line, under the ordinary off headline. Decision 0014: a quiet
         // fact, never a warning, and never the headline.
         XCTAssertEqual(content.headline, "Off - your Mac sleeps normally")
-        XCTAssertEqual(content.detail,
-                       "Amphetamine is holding this Mac awake, so it will not sleep for now.")
+        XCTAssertEqual(content.detail, "Amphetamine is also keeping this Mac from idling.")
     }
 
     func testNoLidIsHiddenNotMerelyDisabled() {
@@ -265,6 +264,21 @@ final class ConflictLineTests: XCTestCase {
     /// Only a system-sleep holder reaches this line at all now, so there is one wording rather
     /// than three. The transient and idle variants went with decision 0014: `caffeinate` and an
     /// Electron app are things Lidwing coexists with, not things it reports.
+    /// **The line may never claim the Mac will not sleep.** It said exactly that to a user with
+    /// Internet Sharing running, whose Mac then slept the moment he closed the lid. No assertion
+    /// of any kind vetoes a clamshell demand sleep - that is why this product sets a kernel bit
+    /// rather than taking an assertion of its own.
+    func testTheLineNeverPromisesTheMacWillStayAwake() {
+        let detail = armed(with: ForeignHolder(pid: 366, name: "Internet Sharing",
+                                               kind: .systemSleep)).detail ?? ""
+        for lie in ["will not sleep", "won't sleep", "keeping this mac awake",
+                    "holding this mac awake", "stays awake"] {
+            XCTAssertFalse(detail.lowercased().contains(lie),
+                           "\"\(detail)\" promises something a lid close disproves")
+        }
+        XCTAssertTrue(detail.contains("Internet Sharing"), detail)
+    }
+
     func testTheLineIsAQuietStatementRatherThanAWarning() {
         let detail = armed(with: ForeignHolder(pid: 366, name: "Internet Sharing",
                                                kind: .systemSleep)).detail

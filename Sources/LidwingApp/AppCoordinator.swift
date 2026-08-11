@@ -92,7 +92,12 @@ final class AppCoordinator {
         SupportDirectory.ensure()
         // The watchdog is started eagerly, not at arm time: bringing it up takes a moment and
         // the arm path refuses to proceed without it.
-        WatchdogInstaller.ensureRunning()
+        // Logged, not discarded. On a user's Mac there was no LaunchAgent at all and no way to
+        // tell whether installing one had been tried and failed or never happened - and the
+        // watchdog is the thing whose absence refuses every arm.
+        let watchdog = WatchdogInstaller.ensureRunningReportingRoute()
+        log.emit(LogCatalogue.watchdogInstall, .watchdog,
+                 ["route": watchdog.route, "ok": String(watchdog.ok), "reason": watchdog.reason])
 
         let observers = SystemObservers { [weak self] signal in
             self?.handle(signal)
@@ -401,9 +406,17 @@ final class AppCoordinator {
     }
 
     func deliver(_ effects: [LidwingEffect]) {
+        let before = machine.state
         var needsRefresh = false
         for effect in effects where perform(effect) {
             needsRefresh = true
+        }
+        // Every transition, at notice level. This is what makes a support log able to answer
+        // "did it arm, refuse, or die" - the automatic arm at launch is now the primary path and
+        // it used to leave no trace whatsoever unless it happened to be refused.
+        if machine.state != before {
+            log.emit(LogCatalogue.stateChanged, .lifecycle,
+                     ["from": before.rawValue, "to": machine.state.rawValue])
         }
         if preferences.hasEverArmed != machine.hasEverArmed {
             preferences.hasEverArmed = machine.hasEverArmed

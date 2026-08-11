@@ -29,8 +29,13 @@ public enum PowerAssertions {
         /// Stops the *idle* timer only. The machine still sleeps when the lid closes, so this
         /// does not do Lidwing's job - but it does mean somebody else is managing sleep.
         case idleSleep
-        /// Stops the system sleeping at all, including on lid close. This is the strong one, and
-        /// the only kind that genuinely overlaps with what Lidwing does.
+        /// Stops the system sleeping for its own reasons - `DenySystemSleep`, held by things like
+        /// Internet Sharing.
+        ///
+        /// **It does not stop a lid close.** Clamshell sleep is a *demand* sleep, and no
+        /// assertion of any kind vetoes one; that is the entire reason this product sets a
+        /// kernel bit instead of taking an assertion. A user with Internet Sharing running was
+        /// told "it will not sleep for now" by a Mac that then slept the moment he shut the lid.
         case systemSleep
         /// Keeps the display awake. Irrelevant to a closed lid.
         case display

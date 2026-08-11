@@ -61,9 +61,43 @@ enum WatchdogInstaller {
 
     @discardableResult
     static func ensureRunning() -> Bool {
-        guard !isTranslocated else { return false }
-        if registerWithServiceManagement() { return true }
-        return bootstrapWithLaunchctl()
+        ensureRunningReportingRoute().ok
+    }
+
+    /// What happened when Lidwing tried to bring the watchdog up.
+    struct InstallOutcome {
+        let ok: Bool
+        /// `SMAppService`, `launchctl`, or `none`.
+        let route: String
+        /// Empty when it worked by the preferred route and there is nothing to explain.
+        let reason: String
+    }
+
+    /// The same thing, but it says which route was taken and why the others were not.
+    ///
+    /// A user's Mac had no LaunchAgent, no `lidwingd`, and every arm refused - and there was no
+    /// way to tell whether installation had been attempted and failed, or never attempted at
+    /// all. The two have completely different fixes, and the log said nothing about either.
+    static func ensureRunningReportingRoute() -> InstallOutcome {
+        guard !isTranslocated else {
+            return InstallOutcome(ok: false, route: "none",
+                                  reason: "running from a translocated read-only mount")
+        }
+        guard isInAStablePlace else {
+            return InstallOutcome(ok: false, route: "none",
+                                  reason: "the app is somewhere a launchd agent cannot point at")
+        }
+        if registerWithServiceManagement() {
+            return InstallOutcome(ok: true, route: "SMAppService", reason: "")
+        }
+        if bootstrapWithLaunchctl() {
+            // Expected on an ad-hoc signed build: SMAppService returns kSMErrorInvalidSignature
+            // without a Developer ID, and this is the documented pre-13 route.
+            return InstallOutcome(ok: true, route: "launchctl",
+                                  reason: "SMAppService declined; used the documented fallback")
+        }
+        return InstallOutcome(ok: false, route: "none",
+                              reason: "both SMAppService and launchctl bootstrap failed")
     }
 
     private static func registerWithServiceManagement() -> Bool {

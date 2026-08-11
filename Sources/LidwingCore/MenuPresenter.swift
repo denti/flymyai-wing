@@ -192,8 +192,12 @@ public struct MenuPresenter {
     /// "Another app is already keeping this Mac awake: powerd (pid 368)", which was false, alarming
     /// and about the operating system.
     static func foreignDetail(_ holder: ForeignHolder) -> String {
+        // Never a claim about the lid. The previous wording - "so it will not sleep for now" -
+        // was simply false: a user with Internet Sharing running read that and then watched the
+        // Mac sleep the instant he closed the lid. No assertion of any kind vetoes a clamshell
+        // demand sleep, which is why this product sets a kernel bit instead of taking one.
         Strings.text("menu.foreign.detail",
-                     "%1$@ is holding this Mac awake, so it will not sleep for now.", holder.name)
+                     "%1$@ is also keeping this Mac from idling.", holder.name)
     }
 
     private static func power(_ snapshot: Snapshot) -> String? {

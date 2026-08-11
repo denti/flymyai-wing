@@ -63,6 +63,19 @@ public enum LogCatalogue {
     public static let osRecheckPassed = LogEvent(
         name: "os_recheck_passed", level: .notice,
         publicFields: ["from", "to"])
+    /// Every state transition, so a support log answers "did it arm, refuse, or die" without
+    /// anybody guessing. The automatic arm at launch used to log nothing at all: `armRequested`
+    /// was emitted only from the menu handler, so the path that now runs on every launch left no
+    /// trace unless it happened to be refused.
+    public static let stateChanged = LogEvent(
+        name: "state_changed", level: .notice,
+        publicFields: ["from", "to"])
+    /// Which route installed the watchdog, or why none did. Without this there is no way to tell
+    /// a Mac with no LaunchAgent from a Mac where installing one failed, and the difference is
+    /// the whole reason an arm gets refused.
+    public static let watchdogInstall = LogEvent(
+        name: "watchdog_install", level: .notice,
+        publicFields: ["route", "ok", "reason"])
     public static let reconciled = LogEvent(
         name: "reconciled", level: .notice,
         publicFields: ["decision", "cause"])
@@ -155,7 +168,8 @@ public enum LogCatalogue {
         publicFields: ["succeeded", "residue"])
 
     public static let all: [LogEvent] = [
-        launch, osChanged, osRecheckPassed, reconciled, terminating,
+        launch, osChanged, osRecheckPassed, reconciled, terminating, stateChanged,
+        watchdogInstall,
         armRequested, armRefused, armApplied, armVerified, armNoEffect,
         reasserted, disarmed, releaseNoEffect, sleptWhileArmed, groundTruthLost,
         thermalState, batteryGuard,

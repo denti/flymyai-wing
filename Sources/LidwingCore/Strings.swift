@@ -156,9 +156,10 @@ public enum StringKey {
          "Failure header when the exact time of the sleep is not known."),
         StringEntry("menu.failed.detail", "See Diagnostics. Protection is not active.", ""),
         StringEntry("menu.foreign.detail",
-         "%1$@ is holding this Mac awake, so it will not sleep for now.",
-         "%1$@ is something holding a system-sleep assertion, such as Internet Sharing. A quiet "
-         + "statement of fact, never a warning: it must not read as a problem the user caused."),
+         "%1$@ is also keeping this Mac from idling.",
+         "%1$@ is something holding a system-sleep assertion, such as Internet Sharing. It must "
+         + "never claim the Mac will not sleep: no assertion stops a lid close, and the earlier "
+         + "wording said exactly that to a user whose Mac then slept when he shut the lid."),
         StringEntry("menu.nolid", "This Mac has no lid",
          "Shown on a desktop Mac. The feature is hidden here, not merely disabled."),
         StringEntry("menu.nolid.detail", "There is no lid-close sleep to prevent here.", ""),
